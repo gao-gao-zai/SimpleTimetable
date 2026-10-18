@@ -34,7 +34,7 @@ GitHub Actions 包含 debug/release 单元测试、Lint，以及 R8 优化后 re
 ./gradlew testReleaseUnitTest lintRelease assembleRelease bundleRelease
 ```
 
-APK 位于 `app/build/outputs/apk/release/app-release.apk`，AAB 位于 `app/build/outputs/bundle/release/app-release.aab`。没有提供签名配置时仅生成 unsigned APK，不能直接安装，也不会自动回退到开发签名。保留同一发布密钥用于后续更新；开发版和发布版签名不同，切换前应先在应用中导出档案备份。
+APK 位于 `app/build/outputs/apk/release/app-release.apk`，AAB 位于 `app/build/outputs/bundle/release/app-release.aab`。没有提供签名配置时仅生成 unsigned APK，不能直接安装，也不会自动回退到开发签名。保留同一发布密钥用于后续更新。开发版和发布版签名不同，不能直接覆盖安装；卸载会删除本地数据。目前未提供普通备份恢复入口，已有开发版数据应先通过 ADB `run-as` 备份 `files/timetable.json`，不要直接卸载。
 
 可在已连接的测试设备上运行 `./gradlew -PtestBuildType=release connectedReleaseAndroidTest`，需要提供发布签名；仅 CI 显式指定 `-PciReleaseSigning=true` 时使用临时测试证书。
 
