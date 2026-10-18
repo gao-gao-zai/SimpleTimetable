@@ -40,7 +40,10 @@ class ReleaseSmokeTest {
         if (root == null) return emptyList()
         return listOf(root) + (0 until root.childCount).flatMap { allNodes(root.getChild(it)) }
     }
-    private fun node(label: String) = allNodes().firstOrNull { it.text?.toString() == label || it.contentDescription?.toString() == label }
+    private fun node(label: String) = allNodes().firstOrNull {
+        it.text?.toString()?.lineSequence()?.any { line -> line == label } == true ||
+            it.contentDescription?.toString()?.lineSequence()?.any { line -> line == label } == true
+    }
     private fun waitFor(label: String, timeout: Long = 15000, condition: () -> Boolean) {
         val until = SystemClock.elapsedRealtime() + timeout
         while (SystemClock.elapsedRealtime() < until) {
