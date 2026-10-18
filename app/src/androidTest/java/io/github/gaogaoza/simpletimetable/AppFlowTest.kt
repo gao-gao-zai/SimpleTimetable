@@ -35,7 +35,10 @@ class AppFlowTest {
     }
     private fun click(text: String) {
         if (compose.onAllNodesWithText(text).fetchSemanticsNodes().isEmpty()) compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(text))
-        compose.onNodeWithText(text).performScrollTo().performClick(); compose.waitForIdle()
+        // Footer actions have no scroll parent. Scroll only content rows.
+        if (compose.onAllNodes(hasText(text) and hasAnyAncestor(hasScrollAction())).fetchSemanticsNodes().isNotEmpty())
+            compose.onNodeWithText(text).performScrollTo()
+        compose.onNodeWithText(text).performClick(); compose.waitForIdle()
     }
     private fun shot(name: String) = captureDevice(name)
     @Test fun navigationTimelinePagingThemeAndDismiss() {
@@ -72,7 +75,8 @@ class AppFlowTest {
         shot("time-picker"); click("确定"); click("保存")
         val slot = Repository(app).current.active().layouts.first().slots.first()
         assertEquals(8 * 3600 + 60, slot.start); assertEquals(8 * 3600 + 46 * 60, slot.end)
-        compose.onNodeWithContentDescription("关闭").performClick(); compose.waitForIdle()
+        compose.onNodeWithContentDescription("关闭").performClick()
+        compose.waitUntil(5000) { compose.onAllNodesWithContentDescription("关闭").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithContentDescription("返回管理").performClick(); compose.waitForIdle()
         click("临时安排"); click("新建临时安排")
         compose.onNodeWithText("名称").performTextInput("运动会")
