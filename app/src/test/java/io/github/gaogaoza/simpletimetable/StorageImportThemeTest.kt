@@ -119,6 +119,21 @@ class StorageImportThemeTest {
             listOf(pink.onSurface to pink.background, pink.onPrimaryContainer to pink.primaryContainer, pink.onPrimary to pink.primary, pink.onSecondaryContainer to pink.secondaryContainer).forEach { (fg,bg) -> assertTrue(ColorUtils.calculateContrast(fg.toArgb(), bg.toArgb()) >= 4.45) }
         }
     }
+    @Test fun readableTextAndControlBordersAcrossSeedsAndModes() {
+        val seeds = listOf("#FFFFFF", "#000000", "#FFFF00", "#00FFFF", "#FF00FF", "#FFDDDD", "#B34E78", "#355E45", "#3568B0", "#7856A6") +
+            (0 until 24).map { "#%06X".format(java.util.Random(it.toLong()).nextInt(0x1000000)) }
+        for (seed in seeds) for (dark in listOf(false, true)) for (high in listOf(false, true)) {
+            val c = ThemeColors.colors(Settings(seed = seed, highContrast = high), dark)
+            val backgrounds = listOf(c.background,c.surface,c.surfaceContainerLowest,c.surfaceContainerLow,c.surfaceContainer,c.surfaceContainerHigh,c.surfaceContainerHighest)
+            fun contrast(fg: androidx.compose.ui.graphics.Color, bg: androidx.compose.ui.graphics.Color, minimum: Double) {
+                val ratio = ColorUtils.calculateContrast(fg.toArgb(), bg.toArgb())
+                assertTrue("$seed dark=$dark high=$high ratio=$ratio minimum=$minimum", ratio >= minimum)
+            }
+            backgrounds.forEach { bg -> contrast(c.onSurface,bg,7.0); contrast(c.onSurfaceVariant,bg,4.5); contrast(c.primary,bg,4.5); contrast(c.tertiary,bg,4.5); contrast(c.error,bg,4.5); contrast(c.outline,bg,3.0) }
+            listOf(c.onPrimaryContainer to c.primaryContainer,c.onSecondaryContainer to c.secondaryContainer,c.onTertiaryContainer to c.tertiaryContainer).forEach { (fg,bg) -> contrast(fg,bg,7.0) }
+            listOf(c.onPrimary to c.primary,c.onSecondary to c.secondary,c.onTertiary to c.tertiary,c.onError to c.error).forEach { (fg,bg) -> contrast(fg,bg,4.5) }
+        }
+    }
     @Test fun softwareCalibrationAndSchoolOffsetStaySeparate() {
         android.provider.Settings.Global.putInt(context.contentResolver, android.provider.Settings.Global.BOOT_COUNT, 8)
         val repo = Repository(context); val clock = AppClock(context,repo)

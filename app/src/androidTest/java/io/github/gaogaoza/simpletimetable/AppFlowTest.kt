@@ -65,6 +65,34 @@ class AppFlowTest {
         assertTrue(Repository(app).current.active().subjects.any { it.name == "信息技术" })
         shot("subjects")
     }
+    @Test fun timetableAndTemporaryCanBeEditedWithPickers() {
+        compose.onNodeWithText("管理",useUnmergedTree=true).performClick(); compose.waitForIdle()
+        click("时间表"); click("秋季作息"); click("第 1 节"); click("开始时间")
+        compose.onNodeWithContentDescription("增加分钟").performScrollTo().performClick(); compose.waitForIdle()
+        shot("time-picker"); click("确定"); click("保存")
+        val slot = Repository(app).current.active().layouts.first().slots.first()
+        assertEquals(8 * 3600 + 60, slot.start); assertEquals(8 * 3600 + 46 * 60, slot.end)
+        compose.onNodeWithContentDescription("关闭").performClick(); compose.waitForIdle()
+        compose.onNodeWithContentDescription("返回管理").performClick(); compose.waitForIdle()
+        click("临时安排"); click("新建临时安排")
+        compose.onNodeWithText("名称").performTextInput("运动会")
+        click("失效时间日期")
+        compose.onNodeWithContentDescription("选择日期 2026-10-14").performScrollTo().performClick(); compose.waitForIdle()
+        shot("expiry-calendar"); click("确定"); click("覆盖来源"); click("周一课表"); click("保存")
+        val temporary = Repository(app).current.active().temporary.single()
+        assertEquals("运动会", temporary.name)
+        assertEquals(date.plusDays(2), Instant.ofEpochMilli(temporary.endMillis).atZone(ZoneId.systemDefault()).toLocalDate())
+    }
+    @Test fun customColorCanBePickedWithoutTypingHex() {
+        compose.onNodeWithText("管理",useUnmergedTree=true).performClick(); compose.waitForIdle()
+        click("显示与时间"); click("主题与阅读"); click("自选颜色")
+        compose.onNodeWithContentDescription("色相").performScrollTo().performTouchInput { click(androidx.compose.ui.geometry.Offset(width * .9f, height / 2f)) }
+        compose.waitForIdle()
+        shot("custom-color"); click("保存")
+        val saved = Repository(app).current.settings.seed
+        assertNotEquals("#B34E78", saved)
+        assertTrue(saved.matches(Regex("#[0-9A-F]{6}")))
+    }
     @Test fun widgetViewsAndSilentForegroundNotificationRunNatively() {
         compose.runOnUiThread {
             val p = app.repository.current.active()

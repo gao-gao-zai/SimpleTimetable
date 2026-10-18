@@ -32,8 +32,8 @@ import java.time.*
 
 @Composable fun TemporaryEditor(app: TimetableApplication, p: Profile, editor: Editor.TemporaryEdit, f: EditForm) {
     val original = remember { p.temporary.firstOrNull { it.id == editor.id } ?: Temporary(startMillis = app.clock.now(), endMillis = Instant.ofEpochMilli(app.clock.now()).atZone(ZoneId.systemDefault()).toLocalDate().plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()) }
-    var name by remember { mutableStateOf(original.name) }; var start by remember { mutableStateOf(localDateTime(original.startMillis)) }; var end by remember { mutableStateOf(localDateTime(original.endMillis)) }; var type by remember { mutableStateOf(original.type.name) }; var target by remember { mutableStateOf(original.targetId) }; var inherit by remember { mutableStateOf(original.inheritGroup) }
-    Input("名称", name, f) { name = it }; Input("生效时间（yyyy-MM-dd HH:mm:ss）", start, f) { start = it }; Input("失效时间", end, f) { end = it }
+    var name by remember { mutableStateOf(original.name) }; var start by remember { mutableLongStateOf(original.startMillis) }; var end by remember { mutableLongStateOf(original.endMillis) }; var type by remember { mutableStateOf(original.type.name) }; var target by remember { mutableStateOf(original.targetId) }; var inherit by remember { mutableStateOf(original.inheritGroup) }
+    Input("名称", name, f) { name = it }; DateTimeControl("生效时间", start, f) { start = it }; DateTimeControl("失效时间", end, f) { end = it }
     if (original.patches.isEmpty()) {
         Choice("安排类型", type, listOf("PLAN" to "临时整张课表", "LAYER" to "临时层（只覆盖相交课程）", "GROUP" to "临时课表群"), f) { type = it; target = "" }
         Choice("覆盖来源", target, if (type == "GROUP") p.groups.map { it.id to it.name } else p.plans.map { it.id to it.name }, f) { target = it }
@@ -41,7 +41,7 @@ import java.time.*
         if (type == "LAYER") Explanation("仅来源课表中已安排科目的课程时段覆盖常规课程，其他时段保留。")
     } else Explanation("这里只修改有效期，已保存的替换或交换内容保持不变。")
     Explanation("可预定未来时间。到期后恢复常规规则，记录保留以便查看。")
-    f.submit = { val item = original.copy(name = requireName(name), startMillis = parseDateTime(start), endMillis = parseDateTime(end), type = TempType.valueOf(type), targetId = target, inheritGroup = inherit); app.repository.editProfile(p.id) { it.copy(temporary = if (editor.id.isEmpty()) it.temporary + item else it.temporary.map { t -> if (t.id == item.id) item else t }) } }
+    f.submit = { val item = original.copy(name = requireName(name), startMillis = start, endMillis = end, type = TempType.valueOf(type), targetId = target, inheritGroup = inherit); app.repository.editProfile(p.id) { it.copy(temporary = if (editor.id.isEmpty()) it.temporary + item else it.temporary.map { t -> if (t.id == item.id) item else t }) } }
     if (editor.id.isNotEmpty()) Action("撤销临时安排", true) { f.ask("撤销后立即按其他有效安排和常规规则运行，继续？") { app.repository.editProfile(p.id) { it.copy(temporary = it.temporary.filterNot { t -> t.id == original.id }) }; f.close() } }
 }
 
@@ -67,22 +67,22 @@ private fun findLesson(app: TimetableApplication, p: Profile, date: String, plan
     val p = data.profiles.first { it.id == editor.profile }; val lesson = findLesson(app, p, editor.date, editor.plan, editor.slot, editor.atSecond)
     if (lesson == null) { Explanation("课程已变更，请返回重新选择。") ; return }
     val date = LocalDate.parse(editor.date); val zone = ZoneId.systemDefault()
-    var subject by remember { mutableStateOf(lesson.subject?.id.orEmpty()) }; var start by remember { mutableStateOf(localDateTime(date.atStartOfDay(zone).toInstant().toEpochMilli())) }; var end by remember { mutableStateOf(localDateTime(date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli())) }
+    var subject by remember { mutableStateOf(lesson.subject?.id.orEmpty()) }; var start by remember { mutableLongStateOf(date.atStartOfDay(zone).toInstant().toEpochMilli()) }; var end by remember { mutableLongStateOf(date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()) }
     Choice("科目", subject, p.subjects.map { it.id to it.name }, f) { subject = it }
-    if (!editor.permanent) { Input("生效时间", start, f) { start = it }; Input("失效时间", end, f) { end = it } } else Explanation("常规修改将影响以后所有使用此课表的日期。")
+    if (!editor.permanent) { DateTimeControl("生效时间", start, f) { start = it }; DateTimeControl("失效时间", end, f) { end = it } } else Explanation("常规修改将影响以后所有使用此课表的日期。")
     f.submit = {
         require(p.subjects.any { it.id == subject }) { "请选择科目" }
         if (editor.permanent) app.repository.editProfile(p.id) { it.copy(plans = it.plans.map { q -> if (q.id == editor.plan) q.copy(subjects = q.subjects + (editor.slot to subject)) else q }) }
-        else { val from = parseDateTime(start); val until = parseDateTime(end); val lessonTime = date.atStartOfDay(zone).toInstant().toEpochMilli() + lesson.slot.start * 1000L; require(from <= lessonTime && lessonTime < until) { "有效期需要包含所选课程开始时刻" }; app.repository.editProfile(p.id) { it.copy(temporary = it.temporary + Temporary(name = "${dateLabel(date)} · 单节修改", type = TempType.LESSON, startMillis = from, endMillis = until, patches = listOf(LessonPatch(editor.date, editor.plan, editor.slot, subject)))) } }
+        else { val from = start; val until = end; val lessonTime = date.atStartOfDay(zone).toInstant().toEpochMilli() + lesson.slot.start * 1000L; require(from <= lessonTime && lessonTime < until) { "有效期需要包含所选课程开始时刻" }; app.repository.editProfile(p.id) { it.copy(temporary = it.temporary + Temporary(name = "${dateLabel(date)} · 单节修改", type = TempType.LESSON, startMillis = from, endMillis = until, patches = listOf(LessonPatch(editor.date, editor.plan, editor.slot, subject)))) } }
     }
 }
 
 @Composable fun SwapEditor(app: TimetableApplication, data: AppData, editor: Editor.Swap, f: EditForm) {
     val p = data.profiles.first { it.id == editor.profile }; val a = findLesson(app, p, editor.date, editor.plan, editor.slot, editor.atSecond)
     if (a == null) { Explanation("课程已变更，请重新选择。") ; return }
-    var date by remember { mutableStateOf(editor.date) }; var target by remember { mutableStateOf("") }; var permanent by remember { mutableStateOf(false) }
-    Input("另一节课的日期（yyyy-MM-dd）", date, f) { date = it; target = "" }
-    val choices = runCatching { Engine.resolve(p, LocalDate.parse(date), app.clock.now()).lessons }.getOrDefault(emptyList())
+    var date by remember { mutableStateOf(LocalDate.parse(editor.date)) }; var target by remember { mutableStateOf("") }; var permanent by remember { mutableStateOf(false) }
+    DateControl("另一节课的日期", date, f) { date = it; target = "" }
+    val choices = runCatching { Engine.resolve(p, date, app.clock.now()).lessons }.getOrDefault(emptyList())
     Choice("交换课程", target, choices.map { "${it.planId}|${it.slot.id}" to "${clockText(it.slot.start)} ${it.subject?.name ?: "未安排"}" }, f) { target = it }
     Toggle("永久交换常规安排", permanent, f) { permanent = it }
     val b = choices.firstOrNull { "${it.planId}|${it.slot.id}" == target }
@@ -92,13 +92,13 @@ private fun findLesson(app: TimetableApplication, p: Profile, date: String, plan
     }
     f.submit = {
         require(b != null && a.subject != null && b.subject != null) { "请先选择已安排科目的另一节课" }
-        require(!(editor.date == date && a.planId == b.planId && a.sourceSlotId == b.sourceSlotId)) { "不能与同一节课交换" }
+        require(!(editor.date == date.toString() && a.planId == b.planId && a.sourceSlotId == b.sourceSlotId)) { "不能与同一节课交换" }
         if (permanent) {
             require(!a.temporary && !b.temporary && (a.planId != b.planId || a.sourceSlotId != b.sourceSlotId)) { "临时课程或同一常规课程位置不能永久交换" }
             app.repository.editProfile(p.id) { profile -> profile.copy(plans = profile.plans.map { q -> var assignments = q.subjects; if (q.id == a.planId) assignments = assignments + (a.sourceSlotId to b.subject.id); if (q.id == b.planId) assignments = assignments + (b.sourceSlotId to a.subject.id); q.copy(subjects = assignments) }) }
         } else {
-            val dates = listOf(LocalDate.parse(editor.date), LocalDate.parse(date)).sorted(); val zone = ZoneId.systemDefault()
-            val temporary = Temporary(name = "两节课程交换", type = TempType.SWAP, startMillis = dates.first().atStartOfDay(zone).toInstant().toEpochMilli(), endMillis = dates.last().plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli(), patches = listOf(LessonPatch(editor.date, a.planId, a.sourceSlotId, b.subject.id), LessonPatch(date, b.planId, b.sourceSlotId, a.subject.id)))
+            val dates = listOf(LocalDate.parse(editor.date), date).sorted(); val zone = ZoneId.systemDefault()
+            val temporary = Temporary(name = "两节课程交换", type = TempType.SWAP, startMillis = dates.first().atStartOfDay(zone).toInstant().toEpochMilli(), endMillis = dates.last().plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli(), patches = listOf(LessonPatch(editor.date, a.planId, a.sourceSlotId, b.subject.id), LessonPatch(date.toString(), b.planId, b.sourceSlotId, a.subject.id)))
             app.repository.editProfile(p.id) { it.copy(temporary = it.temporary + temporary) }
         }
     }
@@ -108,8 +108,15 @@ val seedPresets = listOf("松柏绿" to "#355E45", "海盐蓝" to "#3568B0", "�
 @Composable fun AppearanceEditor(app: TimetableApplication, data: AppData, session: UiSession, f: EditForm) {
     val original = remember { data.settings }; var draft by remember { mutableStateOf(original) }; var seed by remember { mutableStateOf(original.seed) }
     fun change(next: Settings) { draft = next; session.appearanceDraft = next; f.changed() }
-    seedPresets.chunked(2).forEach { pair -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { pair.forEach { (name, color) -> OutlinedButton(onClick = { seed = color; change(draft.copy(seed = color)) }, modifier = Modifier.weight(1f)) { Box(Modifier.size(14.dp).background(Color(android.graphics.Color.parseColor(color)), CircleShape)); Spacer(Modifier.width(6.dp)); Text(name) } } } }
-    Input("自选种子颜色（#RRGGBB）", seed, f) { seed = it; if (it.matches(Regex("#[0-9a-fA-F]{6}"))) change(draft.copy(seed = it)) }
+    ColorControl("主题种子色", seed, f) { seed = it; change(draft.copy(seed = it)) }
+    Surface(color = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer, shape = MaterialTheme.shapes.large) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("文字与控件预览", style = MaterialTheme.typography.titleMedium)
+            Text("课程名称、时间与正文会保持清晰可读。")
+            LinearProgressIndicator(progress = { .6f }, modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.onPrimaryContainer, trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = .15f))
+        }
+    }
+    OutlinedTextField(value = "08:00 — 08:45", onValueChange = {}, readOnly = true, label = { Text("输入框预览") }, modifier = Modifier.fillMaxWidth())
     Choice("显示模式", draft.theme, listOf("light" to "浅色", "dark" to "深色", "system" to "跟随系统"), f) { change(draft.copy(theme = it)) }
     Toggle("大字号", draft.largeText, f) { change(draft.copy(largeText = it)) }; Toggle("高对比度", draft.highContrast, f) { change(draft.copy(highContrast = it)) }; Toggle("减少动画", draft.reducedMotion, f) { change(draft.copy(reducedMotion = it)) }
     Explanation("保存后应用，取消恢复原主题。科目颜色可单独设置。")
@@ -117,12 +124,15 @@ val seedPresets = listOf("松柏绿" to "#355E45", "海盐蓝" to "#3568B0", "�
 }
 
 @Composable fun ClockEditor(app: TimetableApplication, data: AppData, session: UiSession, f: EditForm) {
-    val s = data.settings; var software by remember { mutableStateOf(s.softwareClock) }; var offset by remember { mutableStateOf(s.schoolOffset.toString()) }; var auto by remember { mutableStateOf(s.autoSync) }; var server by remember { mutableStateOf(s.ntpHost) }
-    Choice("时间来源", if (software) "software" else "system", listOf("system" to "系统时间", "software" to "软件时间"), f) { software = it == "software" }; Input("学校时间偏移（秒）", offset, f) { offset = it }; Toggle("自动联网校时", auto, f) { auto = it }; Input("NTP 服务器", server, f) { server = it }
+    val s = data.settings; var software by remember { mutableStateOf(s.softwareClock) }; var offset by remember { mutableIntStateOf(s.schoolOffset) }; var slow by remember { mutableStateOf(s.schoolOffset < 0) }; var auto by remember { mutableStateOf(s.autoSync) }; var server by remember { mutableStateOf(s.ntpHost) }
+    Choice("时间来源", if (software) "software" else "system", listOf("system" to "系统时间", "software" to "软件时间"), f) { software = it == "software" }; Choice("学校时钟方向", if (slow) "slow" else "fast", listOf("fast" to "比设备时间快", "slow" to "比设备时间慢"), f) { slow = it == "slow"; offset = if (slow) -kotlin.math.abs(offset) else kotlin.math.abs(offset) }
+    NumberControl("偏移分钟", kotlin.math.abs(offset) / 60, 0..1440, f, "分钟") { val n = (it * 60 + kotlin.math.abs(offset) % 60).coerceAtMost(86400); offset = if (slow) -n else n }
+    NumberControl("偏移秒", kotlin.math.abs(offset) % 60, 0..if (kotlin.math.abs(offset) / 60 == 1440) 0 else 59, f, "秒") { val n = kotlin.math.abs(offset) / 60 * 60 + it; offset = if (slow) -n else n }
+    Explanation(if (offset == 0) "与设备时间一致" else "学校时间比设备时间${if (offset > 0) "快" else "慢"} ${kotlin.math.abs(offset) / 60} 分 ${kotlin.math.abs(offset) % 60} 秒"); Toggle("自动联网校时", auto, f) { auto = it }; Input("NTP 服务器", server, f) { server = it }
     Explanation("设备校准：${s.calibrationMillis} 毫秒\n状态：${app.clock.status()}\n最近校时：${if (s.syncEpoch > 0) localDateTime(s.syncEpoch) else "尚无"}")
     Explanation("学校偏移独立于设备校准，用于对齐学校作息。软件校时失败时保留可用校准；设备重启后会重新校时。")
     Action("立即校时") { f.run { require(server == s.ntpHost) { "请先保存新的服务器地址" }; app.clock.sync { result -> Handler(Looper.getMainLooper()).post { session.message = if (result.isSuccess) "校时成功" else "校时失败，请检查网络或服务器"; SurfaceUpdater.refresh(app) } } } }
-    f.submit = { require(server.isNotBlank() && server.length <= 253 && !server.contains('/')) { "请填写 NTP 主机名" }; app.repository.settings { it.copy(softwareClock = software, schoolOffset = intRange(offset, -86400..86400), autoSync = auto, ntpHost = server.trim()) }; app.clock.autoSync() }
+    f.submit = { require(server.isNotBlank() && server.length <= 253 && !server.contains('/')) { "请填写 NTP 主机名" }; app.repository.settings { it.copy(softwareClock = software, schoolOffset = offset, autoSync = auto, ntpHost = server.trim()) }; app.clock.autoSync() }
 }
 
 @Composable fun SurfaceSettingsEditor(app: TimetableApplication, data: AppData, session: UiSession, f: EditForm) {
@@ -148,15 +158,7 @@ val seedPresets = listOf("松柏绿" to "#355E45", "海盐蓝" to "#3568B0", "�
 }
 
 @Composable fun DateEditor(session: UiSession, editor: Editor.DatePick, f: EditForm) {
-    if (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 600) {
-        var date by remember { mutableStateOf(editor.initial) }
-        Input("日期（yyyy-MM-dd）",date,f) { date=it }
-        f.submit={ session.date=runCatching { LocalDate.parse(date.trim()) }.getOrElse { error("请输入有效日期，例如 2026-10-12") } }
-    } else {
-        val initial=LocalDate.parse(editor.initial).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-        val picker=rememberDatePickerState(initialSelectedDateMillis=initial)
-        DatePicker(picker)
-        LaunchedEffect(picker.selectedDateMillis) { if (picker.selectedDateMillis!=initial) f.changed() }
-        f.submit={ val selected=requireNotNull(picker.selectedDateMillis) { "请选择日期" };session.date=Instant.ofEpochMilli(selected).atZone(ZoneOffset.UTC).toLocalDate() }
-    }
+    var date by remember { mutableStateOf(LocalDate.parse(editor.initial)) }
+    CalendarControl(date) { date = it; f.changed() }
+    f.submit = { session.date = date }
 }

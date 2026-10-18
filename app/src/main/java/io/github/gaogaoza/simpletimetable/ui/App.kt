@@ -141,7 +141,7 @@ fun dateLabel(date: LocalDate) = "${date.monthValue} 月 ${date.dayOfMonth} 日 
 }
 
 @Composable fun SectionRow(title: String, subtitle: String, icon: ImageVector = Icons.Default.ChevronRight, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
+    Surface(onClick = onClick, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, contentColor = MaterialTheme.colorScheme.onSurface, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(14.dp).heightIn(min = 34.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.surfaceContainerHighest) { Icon(icon, null, Modifier.padding(8.dp).size(22.dp), tint = MaterialTheme.colorScheme.primary) }
             Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) { Text(title, fontWeight = FontWeight.Medium); if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -149,7 +149,7 @@ fun dateLabel(date: LocalDate) = "${date.monthValue} 月 ${date.dayOfMonth} 日 
         }
     }
 }
-@Composable fun InactiveProfile(profile: Profile, db: AppData) { if (profile.id != db.active().id) Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(12.dp)) { Text("正在编辑「${profile.name}」· 未启用", Modifier.fillMaxWidth().padding(12.dp), style = MaterialTheme.typography.bodySmall) } }
+@Composable fun InactiveProfile(profile: Profile, db: AppData) { if (profile.id != db.active().id) Surface(color = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer, shape = RoundedCornerShape(12.dp)) { Text("正在编辑「${profile.name}」· 未启用", Modifier.fillMaxWidth().padding(12.dp), style = MaterialTheme.typography.bodySmall) } }
 @Composable fun ProgressBar(progress: Double?, modifier: Modifier = Modifier) { LinearProgressIndicator(progress = { (progress ?: 0.0).toFloat().coerceIn(0f, 1f) }, modifier = modifier.fillMaxWidth().height(6.dp), trackColor = MaterialTheme.colorScheme.surfaceContainerHighest) }
 fun openLesson(session: UiSession, profile: Profile, date: LocalDate, lesson: Lesson) { session.editor = Editor.Detail(profile.id, date.toString(), lesson.planId, lesson.sourceSlotId, lesson.slot.start) }
 
@@ -160,7 +160,7 @@ fun openLesson(session: UiSession, profile: Profile, date: LocalDate, lesson: Le
         if (!compact) item { TextButton(onClick = { session.editor = Editor.Source }, contentPadding = PaddingValues(0.dp)) { Text(active.name, style = MaterialTheme.typography.labelMedium); Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, Modifier.size(18.dp)) } }
         item {
             if (compact) CompactNowHero(state, active, session)
-            else Surface(shape = RoundedCornerShape(26.dp), color = MaterialTheme.colorScheme.primaryContainer, onClick = { (state.current ?: state.next)?.let { openLesson(session, active, state.resolution.date, it) } }) {
+            else Surface(shape = RoundedCornerShape(26.dp), color = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer, onClick = { (state.current ?: state.next)?.let { openLesson(session, active, state.resolution.date, it) } }) {
                 Column(Modifier.fillMaxWidth().padding(if (compact) 18.dp else 22.dp), verticalArrangement = Arrangement.spacedBy(if (compact) 7.dp else 10.dp)) {
                     Text(state.headingLabel(), style = MaterialTheme.typography.labelMedium)
                     val title = subject?.name?.takeIf { !idle } ?: state.title
@@ -187,7 +187,7 @@ fun openLesson(session: UiSession, profile: Profile, date: LocalDate, lesson: Le
 
 @Composable private fun CompactNowHero(state: CourseState, active: Profile, session: UiSession) {
     val idle = state.phase in listOf(Phase.EMPTY, Phase.ENDED)
-    Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.primaryContainer, onClick = { (state.current ?: state.next)?.let { openLesson(session, active, state.resolution.date, it) } }) {
+    Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer, onClick = { (state.current ?: state.next)?.let { openLesson(session, active, state.resolution.date, it) } }) {
         BoxWithConstraints(Modifier.fillMaxWidth().padding(16.dp)) {
             val narrow = maxWidth < 300.dp
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -209,11 +209,11 @@ fun openLesson(session: UiSession, profile: Profile, date: LocalDate, lesson: Le
     val subject = lesson.subject
     val mainInk = if (current) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
     val mutedInk = if (current) mainInk else MaterialTheme.colorScheme.onSurfaceVariant
-    Surface(onClick = onClick, shape = RoundedCornerShape(18.dp), color = if (current) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh, border = if (current) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null, modifier = Modifier.fillMaxWidth()) {
+    Surface(onClick = onClick, shape = RoundedCornerShape(18.dp), color = if (current) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh, contentColor = mainInk, border = if (current) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
             val color = subject?.color?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() } ?: MaterialTheme.colorScheme.primary
             val badge = color.copy(alpha = .12f).compositeOver(if (current) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh)
-            val ink = if (androidx.core.graphics.ColorUtils.calculateContrast(color.toArgb(), badge.toArgb()) >= 4.5) color else mainInk
+            val ink = ThemeColors.readable(color, listOf(badge), 4.5)
             Surface(color = badge, shape = RoundedCornerShape(10.dp)) { Text(subject?.shortName?.ifBlank { subject.name.take(1) } ?: "空", Modifier.padding(11.dp), color = ink, fontWeight = FontWeight.SemiBold) }
             Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) { Text(subject?.name ?: "未安排科目", fontWeight = if (ended) FontWeight.Normal else FontWeight.SemiBold, color = if (ended) mutedInk else mainInk); Text("${clockText(lesson.slot.start)} — ${clockText(lesson.slot.end)}" + (if (subject?.teacher.isNullOrBlank()) "" else " · ${subject!!.teacher}"), style = MaterialTheme.typography.labelSmall, color = mutedInk); if (lesson.temporary) Text("临时安排", style = MaterialTheme.typography.labelSmall, color = if (current) mainInk else MaterialTheme.colorScheme.tertiary) }
             if (current || ended) Text(if (current) "进行中" else "已结束", fontSize = 10.sp, modifier = Modifier.padding(start = 6.dp)) else Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, Modifier.size(18.dp))

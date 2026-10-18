@@ -82,7 +82,11 @@ class ReleaseSmokeTest {
         click("上一天")
         waitFor("previous date") { node("10 月 12 日 · 周一") != null }
         captureDevice("release-timeline")
-        click("管理"); click("显示与时间"); click("主题与阅读"); click("海盐蓝"); click("保存")
+        click("管理"); click("时间表"); click("秋季作息"); click("第 1 节"); click("开始时间")
+        click("增加分钟"); captureDevice("release-time-picker"); click("确定"); click("保存")
+        waitFor("time picker saved both start and retained duration") { node("08:01 — 08:46") != null }
+        click("关闭"); click("返回管理")
+        click("显示与时间"); click("主题与阅读"); click("海盐蓝"); click("保存")
         shell("am force-stop $target")
         launchTarget()
         waitFor("stored course survives a fresh process") { node("正在上课") != null && node("语文") != null }

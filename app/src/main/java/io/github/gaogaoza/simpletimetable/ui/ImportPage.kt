@@ -4,6 +4,7 @@ import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -21,8 +22,8 @@ import java.io.ByteArrayOutputStream
 @Composable fun ImportPage(app: TimetableApplication, p: Profile, session: UiSession) {
     val scope = rememberCoroutineScope(); val form = remember { EditForm() }
     var busy by remember { mutableStateOf(false) }; var error by remember { mutableStateOf("") }; var tables by remember { mutableStateOf<List<ImportTable>>(emptyList()) }; var sheet by remember { mutableIntStateOf(0) }; var result by remember { mutableStateOf<ImportResult?>(null) }; var imported by remember { mutableStateOf<Profile?>(null) }
-    var fileName by remember { mutableStateOf("") }; var name by remember { mutableStateOf("导入课表") }; var mode by remember { mutableStateOf("records") }; var firstRow by remember { mutableStateOf("2") }; var encoding by remember { mutableStateOf("UTF-8") }; var csvBytes by remember { mutableStateOf<ByteArray?>(null) }
-    var mapping by remember { mutableStateOf(listOf(0, 1, 2, 3, -1)) }; var area by remember { mutableStateOf("B2:F7") }; var days by remember { mutableStateOf("1,2,3,4,5") }; var layout by remember { mutableStateOf(p.layouts.firstOrNull()?.id.orEmpty()) }; var transpose by remember { mutableStateOf(false) }; var activate by remember { mutableStateOf(false) }
+    var fileName by remember { mutableStateOf("") }; var name by remember { mutableStateOf("导入课表") }; var mode by remember { mutableStateOf("records") }; var firstRow by remember { mutableIntStateOf(2) }; var encoding by remember { mutableStateOf("UTF-8") }; var csvBytes by remember { mutableStateOf<ByteArray?>(null) }
+    var mapping by remember { mutableStateOf(listOf(0, 1, 2, 3, -1)) }; var startRow by remember { mutableIntStateOf(2) }; var endRow by remember { mutableIntStateOf(7) }; var startCol by remember { mutableIntStateOf(1) }; var endCol by remember { mutableIntStateOf(5) }; var days by remember { mutableStateOf((1..7).map { it % 7 }) }; var layout by remember { mutableStateOf(p.layouts.firstOrNull()?.id.orEmpty()) }; var transpose by remember { mutableStateOf(false) }; var activate by remember { mutableStateOf(false) }
     val choose = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) scope.launch {
         busy = true; error = ""; result = null; imported = null; tables = emptyList(); csvBytes = null; sheet = 0
         try {
@@ -67,24 +68,43 @@ import java.io.ByteArrayOutputStream
             } else if (tables.isNotEmpty()) {
                 Choice("工作表", sheet.toString(), tables.mapIndexed { i, t -> i.toString() to t.name }, form) { sheet = it.toInt() }
                 val table = tables[sheet]
-                Row(Modifier.horizontalScroll(rememberScrollState())) { Text(table.rows.take(6).joinToString("\n") { row -> row.take(8).joinToString("  |  ") }, style = MaterialTheme.typography.bodySmall) }
+                val rowCount = table.rows.size.coerceAtLeast(1)
+                val columnCount = table.rows.maxOfOrNull { it.size }?.coerceAtLeast(1) ?: 1
+                LaunchedEffect(table) {
+                    firstRow = firstRow.coerceIn(1..rowCount)
+                    startRow = startRow.coerceIn(1..rowCount); endRow = endRow.coerceIn(startRow..rowCount)
+                    startCol = startCol.coerceIn(0 until columnCount); endCol = endCol.coerceIn(startCol until columnCount)
+                    mapping = mapping.map { if (it < columnCount) it else -1 }
+                }
+                SpreadsheetPreview(table, (firstRow - 1).coerceIn(0 until rowCount))
                 Input("新档案名称", name, form) { name = it }
                 Choice("表格布局", mode, listOf("records" to "每行一节课（列映射）", "grid" to "周课表网格（区域与作息）"), form) { mode = it }
                 if (mode == "records") {
-                    Input("第一条课程数据所在行（从 1 起）", firstRow, form, true) { firstRow = it }
-                    val headings = table.rows.firstOrNull().orEmpty().mapIndexed { i, h -> i.toString() to "第 ${i + 1} 列 · ${h.take(30)}" }
+                    NumberControl("第一条课程数据所在行", firstRow, 1..rowCount, form, "行") { firstRow = it }
+                    val headings = table.rows.firstOrNull().orEmpty().mapIndexed { i, h -> i.toString() to "${columnLetters(i)} 列 · ${h.take(20)} · ${table.rows.getOrNull(firstRow - 1)?.getOrNull(i).orEmpty().take(16)}" }
                     listOf("星期列", "开始时间列", "结束时间列", "科目列", "教师列").forEachIndexed { i, title -> Choice(title, mapping[i].toString(), if (i == 4) listOf("-1" to "不导入教师") + headings else headings, form) { v -> mapping = mapping.toMutableList().also { it[i] = v.toInt() } } }
                     Explanation("星期支持 1—7 或周一至周日；时间支持 HH:mm、HH:mm:ss 和 Excel 时间数值。")
                 } else {
-                    Input("科目区域（例如 B2:F7）", area, form) { area = it }
-                    Input("对应星期，逗号分隔（1—7）", days, form) { days = it }
+                    Text("选择课程区域", style = MaterialTheme.typography.titleSmall)
+                    val columns = (0 until columnCount).map { it.toString() to "${columnLetters(it)} 列 · ${table.rows.firstOrNull()?.getOrNull(it).orEmpty().take(24)}" }
+                    NumberControl("起始行", startRow, 1..rowCount, form, "行") { startRow = it; endRow = endRow.coerceAtLeast(it) }
+                    Choice("起始列", startCol.toString(), columns, form) { startCol = it.toInt(); endCol = endCol.coerceAtLeast(startCol) }
+                    NumberControl("结束行", endRow, startRow..rowCount, form, "行") { endRow = it }
+                    Choice("结束列", endCol.toString(), columns.filter { it.first.toInt() >= startCol }, form) { endCol = it.toInt() }
+                    Explanation("已选 ${columnLetters(startCol)}$startRow — ${columnLetters(endCol)}$endRow")
                     Toggle("星期按行排列", transpose, form) { transpose = it }
+                    val axis = if (transpose) endRow - startRow + 1 else endCol - startCol + 1
+                    if (axis > 7) Text("一周最多 7 天，请缩小星期方向上的区域。", color = MaterialTheme.colorScheme.error)
+                    (0 until minOf(axis, 7)).forEach { index ->
+                        val axisLabel = if (transpose) "第 ${startRow + index} 行" else "${columnLetters(startCol + index)} 列"
+                        Choice("$axisLabel 对应星期", days[index].toString(), listOf(1, 2, 3, 4, 5, 6, 0).map { it.toString() to "周${"日一二三四五六"[it]}" }, form) { v -> days = days.toMutableList().also { it[index] = v.toInt() } }
+                    }
                     Choice("用于对应课程时间的时间表", layout, p.layouts.map { it.id to it.name }, form) { layout = it }
                     Action("新建时间表") { session.editor = Editor.LayoutEdit() }
                 }
                 Button(onClick = {
                     error = ""
-                    try { result = if (mode == "records") Importers.records(table, requireName(name), mapping, intRange(firstRow, 1..2000) - 1) else Importers.grid(table, requireName(name), area, days.replace('，', ',').split(',').map(Importers::parseDay), p.layouts.firstOrNull { it.id == layout } ?: kotlin.error("请选择时间表"), transpose) }
+                    try { result = if (mode == "records") Importers.records(table, requireName(name), mapping, firstRow - 1) else Importers.grid(table, requireName(name), "${columnLetters(startCol)}$startRow:${columnLetters(endCol)}$endRow", days.take(if (transpose) endRow - startRow + 1 else endCol - startCol + 1), p.layouts.firstOrNull { it.id == layout } ?: kotlin.error("请选择时间表"), transpose) }
                     catch (e: Exception) { error = e.message.orEmpty() }
                 }, modifier = Modifier.fillMaxWidth()) { Text("检查并预览") }
             }
@@ -92,4 +112,32 @@ import java.io.ByteArrayOutputStream
         if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
     }
     if (activate) AlertDialog(onDismissRequest = { activate = false }, title = { Text("切换当前运行档案？") }, text = { Text("现在页、通知和小组件会立即使用新档案。") }, confirmButton = { TextButton(onClick = { imported?.let { p -> app.repository.update { it.copy(activeProfile = p.id) }; session.profileId = p.id; session.page = "home" }; activate = false }) { Text("切换") } }, dismissButton = { TextButton(onClick = { activate = false }) { Text("返回") } })
+}
+
+fun columnLetters(index: Int): String {
+    var n = index + 1; var letters = ""
+    while (n > 0) { n--; letters = ('A' + n % 26) + letters; n /= 26 }
+    return letters
+}
+
+@Composable private fun SpreadsheetPreview(table: ImportTable, selectedRow: Int) {
+    Text("表格预览 · 高亮行为首条课程", style = MaterialTheme.typography.labelLarge)
+    val first = (selectedRow - 2).coerceAtLeast(0)
+    Column(Modifier.horizontalScroll(rememberScrollState())) {
+        Row {
+            Text("行", Modifier.width(40.dp).padding(6.dp), style = MaterialTheme.typography.labelSmall)
+            (0 until minOf(table.rows.maxOfOrNull { it.size } ?: 0, 20)).forEach { Text(columnLetters(it), Modifier.width(108.dp).padding(6.dp), style = MaterialTheme.typography.labelSmall) }
+        }
+        table.rows.drop(first).take(6).forEachIndexed { index, row ->
+            val active = first + index == selectedRow
+            Surface(color = if (active) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+                contentColor = if (active) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)) {
+                Row {
+                    Text((first + index + 1).toString(), Modifier.width(40.dp).padding(6.dp), style = MaterialTheme.typography.bodySmall)
+                    row.take(20).forEach { cell -> Text(cell.ifBlank { "—" }, Modifier.width(108.dp).padding(6.dp), style = MaterialTheme.typography.bodySmall, maxLines = 2) }
+                }
+            }
+        }
+    }
 }

@@ -47,13 +47,72 @@ class AppUiTest {
         compose.onNodeWithContentDescription("下一天").performClick()
         compose.onNodeWithText("周二课表").assertExists()
         compose.onNodeWithText("10 月 13 日 · 周二").performClick()
-        compose.onNodeWithText("日期（yyyy-MM-dd）").performTextReplacement("2026-10-14")
+        compose.onNodeWithContentDescription("选择日期 2026-10-14").performScrollTo()
+        compose.onNodeWithContentDescription("选择日期 2026-10-14").performClick()
         compose.onNodeWithText("保存").performClick()
         compose.onNodeWithText("周三课表").assertExists()
     }
-    private fun capture(name:String) {
+    @Test fun timetableTimePickerPreservesDurationAndSaves() {
+        compose.onNodeWithText("管理",useUnmergedTree=true).performClick()
+        compose.onNodeWithText("时间表").performScrollTo().performClick()
+        compose.onNodeWithText("秋季作息").performClick()
+        compose.onNodeWithText("第 1 节").performScrollTo().performClick()
+        compose.onNodeWithText("开始时间").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("增加分钟").performScrollTo().performClick()
+        capture("time-picker", dialog = true)
+        compose.onNodeWithText("确定").performClick()
+        compose.onNodeWithText("保存").performClick()
+        val slot = Repository(app).current.active().layouts.first().slots.first()
+        assertEquals(8 * 3600 + 60, slot.start)
+        assertEquals(8 * 3600 + 46 * 60, slot.end)
+        compose.onNodeWithText("新增时段").performScrollTo().assertExists()
+    }
+    @Test @Config(qualifiers="w274dp-h335dp-hdpi") fun smallWatchCalendarHasSelectableDates() {
+        compose.onNodeWithText("课表",useUnmergedTree=true).performClick()
+        compose.onNode(hasClickAction() and SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.Text, listOf(androidx.compose.ui.text.AnnotatedString("今天")))).performClick()
+        compose.onNodeWithText("10 月 12 日 · 周一").performClick()
+        compose.onNodeWithContentDescription("选择日期 2026-10-14").performScrollTo()
+        compose.onNodeWithContentDescription("选择日期 2026-10-14").performClick()
+        capture("watch-calendar", dialog = true)
+        compose.onNodeWithText("保存").performClick()
+        compose.onNodeWithText("周三课表").assertExists()
+    }
+    @Test fun temporaryExpiryUsesDateAndTimePickers() {
+        compose.onNodeWithText("管理",useUnmergedTree=true).performClick()
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("临时安排"))
+        compose.onNodeWithText("临时安排").performClick()
+        compose.onNodeWithText("新建临时安排").performClick()
+        compose.onNodeWithText("名称").performTextInput("运动会")
+        compose.onNodeWithText("失效时间日期").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("选择日期 2026-10-14").performScrollTo()
+        compose.onNodeWithContentDescription("选择日期 2026-10-14").performClick()
+        compose.onNodeWithText("确定").performClick()
+        compose.onNodeWithText("覆盖来源").performScrollTo()
+        compose.onNodeWithText("覆盖来源").performClick()
+        compose.onNodeWithText("周一课表").performClick()
+        compose.onNodeWithText("保存").performClick()
+        val temporary = Repository(app).current.active().temporary.single()
+        assertEquals("运动会", temporary.name)
+        assertEquals(java.time.LocalDate.of(2026,10,14), java.time.Instant.ofEpochMilli(temporary.endMillis).atZone(java.time.ZoneId.systemDefault()).toLocalDate())
+    }
+    @Test fun cycleWeekIsBoundedAndAnchorChosenFromCalendar() {
+        compose.onNodeWithText("管理",useUnmergedTree=true).performClick()
+        compose.onNode(hasText("课表") and hasText("5 份 · 日期与多周规则")).performScrollTo().performClick()
+        compose.onNodeWithText("周一课表").performClick()
+        compose.onNodeWithContentDescription("增加轮换总周数").performScrollTo()
+        compose.onNodeWithContentDescription("增加轮换总周数").performClick()
+        compose.onNodeWithText("第 1 周基准").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("选择日期 2026-10-14").performScrollTo()
+        compose.onNodeWithContentDescription("选择日期 2026-10-14").performClick()
+        compose.onNodeWithText("确定").performClick()
+        compose.onNodeWithText("保存").performClick()
+        val plan = Repository(app).current.active().plans.first()
+        assertEquals(2, plan.cycle)
+        assertEquals("2026-10-12", plan.anchor)
+    }
+    private fun capture(name:String, dialog:Boolean = false) {
         compose.runOnIdle {
-            val view=compose.activity.window.decorView
+            val view=if (dialog) requireNotNull(org.robolectric.shadows.ShadowDialog.getLatestDialog().window).decorView else compose.activity.window.decorView
             val bitmap=android.graphics.Bitmap.createBitmap(view.width,view.height,android.graphics.Bitmap.Config.ARGB_8888)
             view.draw(android.graphics.Canvas(bitmap))
             val file=File("build/acceptance/$name.png");file.parentFile!!.mkdirs()

@@ -36,7 +36,10 @@ class EditForm {
     var error by mutableStateOf("")
     var confirmText by mutableStateOf("")
     var pending: (() -> Unit)? = null
+    var hasSubmit by mutableStateOf(false)
+        private set
     var submit: (() -> Unit)? = null
+        set(value) { field = value; hasSubmit = value != null }
     var afterSave: (() -> Unit)? = null
     var close: () -> Unit = {}
     var open: (Editor) -> Unit = {}
@@ -81,8 +84,9 @@ fun editorTitle(editor: Editor): String = when (editor) {
         val height = LocalConfiguration.current.screenHeightDp.dp
         val px = with(LocalDensity.current) { height.toPx() }
         Dialog(onDismissRequest = ::closeRequest, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false, decorFitsSystemWindows = false)) {
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .38f * progress)).clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) { closeRequest() }.systemBarsPadding().imePadding(), contentAlignment = Alignment.BottomCenter) {
-                Surface(shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth().heightIn(max = height * .94f).graphicsLayer { translationY = (1 - progress) * px }.clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) {}) {
+            Box(Modifier.fillMaxSize().systemBarsPadding().imePadding(), contentAlignment = Alignment.BottomCenter) {
+                Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = .38f * progress)).clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) { closeRequest() })
+                Surface(shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, contentColor = MaterialTheme.colorScheme.onSurface, modifier = Modifier.fillMaxWidth().heightIn(max = height * .94f).graphicsLayer { translationY = (1 - progress) * px }) {
                     Column {
                         Box(Modifier.padding(top = 10.dp, bottom = 2.dp).width(32.dp).height(4.dp).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .4f), RoundedCornerShape(2.dp)).align(Alignment.CenterHorizontally))
                         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) { Text(editorTitle(editor), Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium); IconButton(onClick = ::closeRequest) { Icon(Icons.Default.Close, "关闭") } }
@@ -109,7 +113,7 @@ fun editorTitle(editor: Editor): String = when (editor) {
                             if (form.error.isNotBlank()) { val bring = remember { BringIntoViewRequester() }; LaunchedEffect(form.error) { bring.bringIntoView() }; Text(form.error, color = MaterialTheme.colorScheme.error, modifier = Modifier.bringIntoViewRequester(bring)) }
                             Spacer(Modifier.height(6.dp))
                         }
-                        if (form.submit != null) Button(onClick = { form.run { form.submit?.invoke(); form.dirty = false; val after = form.afterSave; if (after != null) after() else closeForce() } }, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp).heightIn(min = 48.dp)) { Text("保存") }
+                        if (form.hasSubmit) Button(onClick = { form.run { form.submit?.invoke(); form.dirty = false; val after = form.afterSave; if (after != null) after() else closeForce() } }, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp).heightIn(min = 48.dp)) { Text("保存") }
                     }
                 }
             }
@@ -119,12 +123,12 @@ fun editorTitle(editor: Editor): String = when (editor) {
 }
 
 @Composable fun Input(label: String, value: String, form: EditForm, number: Boolean = false, onChange: (String) -> Unit) {
-    TextField(value = value, onValueChange = { form.changed(); onChange(it) }, label = { Text(label) }, modifier = Modifier.fillMaxWidth(), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = if (number) KeyboardType.Number else KeyboardType.Text))
+    OutlinedTextField(value = value, onValueChange = { form.changed(); onChange(it) }, label = { Text(label) }, modifier = Modifier.fillMaxWidth(), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = if (number) KeyboardType.Number else KeyboardType.Text))
 }
 @Composable fun Choice(label: String, selected: String, options: List<Pair<String, String>>, form: EditForm, onChange: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { if (options.isNotEmpty()) expanded = !expanded }) {
-        TextField(value = options.firstOrNull { it.first == selected }?.second ?: "请选择", onValueChange = {}, readOnly = true, label = { Text(label) }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) }, modifier = Modifier.fillMaxWidth().menuAnchor())
+        OutlinedTextField(value = options.firstOrNull { it.first == selected }?.second ?: "请选择", onValueChange = {}, readOnly = true, label = { Text(label) }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) }, modifier = Modifier.fillMaxWidth().menuAnchor())
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) { options.forEach { (id, text) -> DropdownMenuItem(text = { Text(text) }, onClick = { expanded = false; form.changed(); onChange(id) }) } }
     }
 }
