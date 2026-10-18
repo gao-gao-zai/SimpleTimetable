@@ -1,8 +1,18 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+val releaseSigningFile = file(providers.environmentVariable("SIMPLETIMETABLE_SIGNING_PROPERTIES")
+    .orElse(rootProject.file("signing.properties").absolutePath).get())
+val releaseSigning = Properties().apply {
+    if (releaseSigningFile.isFile) releaseSigningFile.inputStream().use { load(it) }
+}
+// CI uses an ephemeral test certificate; the distribution key never enters GitHub.
+val ciReleaseSigning = providers.environmentVariable("CI").orNull == "true" &&
+    providers.gradleProperty("ciReleaseSigning").orNull == "true"
 android {
     namespace = "io.github.gaogaoza.simpletimetable"
     compileSdk = 35
@@ -15,6 +25,28 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; buildConfig = true }
+    signingConfigs {
+        if (releaseSigningFile.isFile) create("distribution") {
+            storeFile = releaseSigningFile.parentFile.resolve(requireNotNull(releaseSigning.getProperty("storeFile")))
+            storePassword = requireNotNull(releaseSigning.getProperty("storePassword"))
+            keyAlias = requireNotNull(releaseSigning.getProperty("keyAlias"))
+            keyPassword = requireNotNull(releaseSigning.getProperty("keyPassword"))
+        }
+    }
+    buildTypes {
+        getByName("release") {
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = when {
+                releaseSigningFile.isFile -> signingConfigs.getByName("distribution")
+                ciReleaseSigning -> signingConfigs.getByName("debug")
+                else -> null
+            }
+        }
+    }
+    testBuildType = providers.gradleProperty("testBuildType").orElse("debug").get()
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

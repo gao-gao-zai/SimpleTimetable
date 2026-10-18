@@ -1,17 +1,27 @@
 #!/usr/bin/env bash
 set -u
 screen="$1"
+variant="${2:-debug}"
+case "$variant" in
+  debug) variant_task=Debug ;;
+  release) variant_task=Release ;;
+  *) printf 'Unsupported build variant: %s\n' "$variant" >&2; exit 2 ;;
+esac
+gradle_args=("-PtestBuildType=$variant")
+if [ "$variant" = release ]; then
+  gradle_args+=("-PciReleaseSigning=true")
+fi
 mkdir -p app/build/device-evidence
 adb shell wm size "$screen"
 adb shell wm density 160
 adb shell wm dismiss-keyguard
 adb shell input keyevent 82
 adb shell mkdir -p /data/local/tmp/simpletimetable
-if ! ./gradlew installDebug installDebugAndroidTest --console=plain; then
+if ! ./gradlew "install${variant_task}" "install${variant_task}AndroidTest" "${gradle_args[@]}" --console=plain; then
   exit 1
 fi
 adb shell appwidget grantbind --package io.github.gaogaoza.simpletimetable --user 0
-if ./gradlew connectedDebugAndroidTest --console=plain; then
+if ./gradlew "connected${variant_task}AndroidTest" "${gradle_args[@]}" --console=plain; then
   test_exit=0
 else
   test_exit=$?

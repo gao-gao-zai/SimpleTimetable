@@ -23,6 +23,10 @@ class AppFlowTest {
     private val app get() = compose.activity.application as TimetableApplication
     private val date = LocalDate.of(2026,10,12)
     @Before fun seed() {
+        if (BuildConfig.BUILD_TYPE == "release") {
+            assertEquals("Release APK must not be debuggable", 0,
+                app.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)
+        }
         compose.runOnUiThread {
             val p = SampleData.profile("验收课表")
             app.repository.update { AppData(profiles = listOf(p), activeProfile = p.id, settings = Settings(seed = "#B34E78", softwareClock = true, autoSync = false, syncEpoch = date.atTime(8,10).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(), syncElapsed = SystemClock.elapsedRealtime(), syncBootCount = AndroidSettings.Global.getInt(app.contentResolver, AndroidSettings.Global.BOOT_COUNT,-1))) }

@@ -32,7 +32,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: false
-      - run: ./gradlew testDebugUnitTest lintDebug assembleDebug
+      - run: ./gradlew testDebugUnitTest testReleaseUnitTest lintDebug lintRelease assembleDebug assembleRelease
       - uses: actions/upload-artifact@v4
         with:
           name: SimpleTimetable-debug
@@ -40,6 +40,8 @@ jobs:
             app/build/outputs/apk/debug/*.apk
             app/build/reports/tests/
             app/build/reports/lint-results-debug.html
+            app/build/reports/lint-results-release.html
+            app/build/outputs/mapping/release/
             app/build/acceptance/
   android11:
     timeout-minutes: 25
@@ -69,11 +71,11 @@ jobs:
           target: default
           disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: ci/emulator-check.sh ${{ matrix.screen }}
+          script: ci/emulator-check.sh ${{ matrix.screen }} release
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: android11-${{ matrix.screen }}
+          name: android11-release-${{ matrix.screen }}
           path: |
             app/build/reports/androidTests/
             app/build/outputs/androidTest-results/
