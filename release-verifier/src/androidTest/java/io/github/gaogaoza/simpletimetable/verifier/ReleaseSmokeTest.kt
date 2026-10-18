@@ -67,14 +67,16 @@ class ReleaseSmokeTest {
             allNodes().lastOrNull { it.isScrollable }?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
             SystemClock.sleep(200)
         }
-        fail("No clickable accessibility node: $label")
+        fail("No clickable accessibility node: $label; visible=${allNodes().mapNotNull { it.text?.toString() }.take(50)}")
     }
     @Test fun optimizedReleaseReadsStoredDataAndSavesThemeThroughSystemUi() {
         waitFor("persisted current lesson") { node("正在上课") != null && node("语文") != null }
         captureDevice("release-now-pink")
         click("课表")
         waitFor("timeline") { node("下一天") != null }
-        click("今天")
+        // This process loaded the calibrated fixture before creating its UI,
+        // so it already displays today. The date row also says 今天 and opens
+        // a picker; avoid confusing that label with the app bar's Today action.
         click("下一天")
         waitFor("next date") { node("10 月 13 日 · 周二") != null }
         click("上一天")
