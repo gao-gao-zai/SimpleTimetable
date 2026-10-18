@@ -32,7 +32,7 @@ class ReleaseSmokeTest {
     private val automation get() = instrumentation.uiAutomation
     private val target = "io.github.gaogaoza.simpletimetable"
     private fun shell(command: String): String = ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).bufferedReader().use { it.readText() }
-    private fun launchTarget() { shell("am start -W -n $target/.MainActivity") }
+    private fun launchTarget() { shell("am start -W -S -n $target/.MainActivity") }
     @Before fun launchRelease() {
         assertEquals("Target must be the actual non-debuggable release APK",0,
             context.packageManager.getApplicationInfo(target,0).flags and ApplicationInfo.FLAG_DEBUGGABLE)
