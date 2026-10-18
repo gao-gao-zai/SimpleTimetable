@@ -22,7 +22,7 @@
 
 第二条命令需要已启动的 Android 设备或模拟器。APK 在 `app/build/outputs/apk/debug/app-debug.apk`，这是开发签名包。首次进入创建空白档案，可以新建数据、导入文件，或在“新建档案”时主动勾选示例数据。核心功能不要求联网权限授权、通知授权或账号。
 
-GitHub Actions 包含 debug/release 单元测试、Lint，以及 R8 优化后 release 在 Android 11 的 410×502、410×410、411×891 测试矩阵。CI 设备测试用临时测试签名，分发密钥不会上传至 GitHub。
+GitHub Actions 包含 debug/release 单元测试、Lint，以及 Android 11 的 410×502、410×410、411×891 测试矩阵。每个尺寸先运行 Compose 开发版测试，再安装 R8 优化后、不可调试的 release，以系统无障碍接口验证界面、持久化、通知及实际小组件。CI 设备测试用临时测试签名，分发密钥不会上传至 GitHub。
 
 ### 发布构建
 
@@ -36,7 +36,7 @@ GitHub Actions 包含 debug/release 单元测试、Lint，以及 R8 优化后 re
 
 APK 位于 `app/build/outputs/apk/release/app-release.apk`，AAB 位于 `app/build/outputs/bundle/release/app-release.aab`。没有提供签名配置时仅生成 unsigned APK，不能直接安装，也不会自动回退到开发签名。保留同一发布密钥用于后续更新。开发版和发布版签名不同，不能直接覆盖安装；卸载会删除本地数据。目前未提供普通备份恢复入口，已有开发版数据应先通过 ADB `run-as` 备份 `files/timetable.json`，不要直接卸载。
 
-可在已连接的测试设备上运行 `./gradlew -PtestBuildType=release connectedReleaseAndroidTest`，需要提供发布签名；仅 CI 显式指定 `-PciReleaseSigning=true` 时使用临时测试证书。
+普通 Compose 测试依赖可被压缩移除的测试接口，因此正式包的系统层验证用 `ci/release-smoke.sh`；它仅供 CI 空白模拟器使用，会先通过开发包写入固定示例，再以同一临时签名换装不可调试的正式包。不要在有真实课表数据的设备上运行该脚本。仅 CI 显式指定 `-PciReleaseSigning=true` 时使用临时测试证书。
 
 ## 文档
 

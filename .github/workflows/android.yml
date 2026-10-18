@@ -71,7 +71,9 @@ jobs:
           target: default
           disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: ci/emulator-check.sh ${{ matrix.screen }} release
+          script: |
+            ci/emulator-check.sh ${{ matrix.screen }} debug
+            ci/release-smoke.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
