@@ -41,7 +41,7 @@ class AppFlowTest {
     @Test fun navigationTimelinePagingThemeAndDismiss() {
         compose.onNodeWithText("正在上课").assertExists(); shot("now-pink")
         compose.onNodeWithText("课表", useUnmergedTree = true).performClick(); compose.waitForIdle()
-        compose.onNodeWithText("今天").performClick(); compose.waitForIdle()
+        compose.onNode(hasClickAction() and SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.Text, listOf(androidx.compose.ui.text.AnnotatedString("今天")))).performClick(); compose.waitForIdle()
         compose.onNodeWithContentDescription("下一天").performClick(); compose.waitForIdle()
         compose.onNodeWithText(dateLabelForTest(date.plusDays(1))).assertExists(); shot("timeline")
         compose.onNodeWithContentDescription("上一天").performClick(); compose.waitForIdle()

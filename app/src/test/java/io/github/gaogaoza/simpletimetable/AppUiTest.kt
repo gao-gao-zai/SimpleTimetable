@@ -42,7 +42,7 @@ class AppUiTest {
         compose.onNodeWithText("今日课程 · 6 节").assertDoesNotExist()
         compose.onNodeWithContentDescription("下一天").assertExists()
         compose.mainClock.autoAdvance=true
-        compose.onNodeWithText("今天").performClick()
+        compose.onNode(hasClickAction() and SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.Text, listOf(androidx.compose.ui.text.AnnotatedString("今天")))).performClick()
         compose.onNodeWithText("周一课表").assertExists();capture("timeline")
         compose.onNodeWithContentDescription("下一天").performClick()
         compose.onNodeWithText("周二课表").assertExists()
