@@ -6,4 +6,4 @@ dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
 rootProject.name = "SimpleTimetable"
-include(":app")
+include(":app", ":release-verifier")

@@ -1,4 +1,4 @@
-package io.github.gaogaoza.simpletimetable
+package io.github.gaogaoza.simpletimetable.verifier
 
 import android.app.NotificationManager
 import android.appwidget.*
@@ -20,7 +20,8 @@ import org.json.JSONObject
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
-import java.io.File
+import androidx.test.core.app.ActivityScenario
+import android.os.ParcelFileDescriptor
 
 /** Exercises the actual optimized APK through Android APIs, without Compose
  * test hooks or references to application classes that R8 can rename/remove. */
@@ -29,11 +30,13 @@ class ReleaseSmokeTest {
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val context get() = instrumentation.targetContext
     private val automation get() = instrumentation.uiAutomation
+    private val target = "io.github.gaogaoza.simpletimetable"
+    private fun shell(command: String): String = ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).bufferedReader().use { it.readText() }
+    private fun launchTarget() { shell("am start -W -n $target/.MainActivity") }
     @Before fun launchRelease() {
-        Assume.assumeTrue("Run after installing the optimized release APK",
-            context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE == 0)
-        context.startActivity(requireNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
+        assertEquals("Target must be the actual non-debuggable release APK",0,
+            context.packageManager.getApplicationInfo(target,0).flags and ApplicationInfo.FLAG_DEBUGGABLE)
+        launchTarget()
         waitFor("release home") { node("现在") != null }
     }
     private fun allNodes(root: AccessibilityNodeInfo? = automation.rootInActiveWindow): List<AccessibilityNodeInfo> {
@@ -78,26 +81,33 @@ class ReleaseSmokeTest {
         waitFor("previous date") { node("10 月 12 日 · 周一") != null }
         captureDevice("release-timeline")
         click("管理"); click("显示与时间"); click("主题与阅读"); click("海盐蓝"); click("保存")
-        waitFor("theme written to the unmodified storage schema") {
-            JSONObject(File(context.filesDir,"timetable.json").readText()).getJSONObject("settings").getString("seed") == "#3568B0"
+        shell("am force-stop $target")
+        launchTarget()
+        waitFor("stored course survives a fresh process") { node("正在上课") != null && node("语文") != null }
+        click("管理"); click("显示与时间"); click("主题与阅读")
+        waitFor("theme survives a fresh process") {
+            if(node("#3568B0") != null) true else {
+                allNodes().lastOrNull { it.isScrollable }?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
+                SystemClock.sleep(200); false
+            }
         }
-        val profile = JSONObject(File(context.filesDir,"timetable.json").readText()).getJSONArray("profiles").getJSONObject(0)
-        assertEquals(6, profile.getJSONArray("subjects").length())
-        assertEquals("语文", profile.getJSONArray("subjects").getJSONObject(0).getString("name"))
         captureDevice("release-settings-blue")
     }
     private fun views(root: View): List<View> = listOf(root) + if (root is ViewGroup)
         (0 until root.childCount).flatMap { views(root.getChildAt(it)) } else emptyList()
     @Test fun optimizedReleaseRunsSilentNotificationAndBothRealWidgets() {
-        val notifications=context.getSystemService(NotificationManager::class.java)
-        waitFor("silent ongoing notification") { notifications.activeNotifications.isNotEmpty() }
-        val notice=notifications.activeNotifications.first().notification
-        assertTrue(notice.flags and android.app.Notification.FLAG_ONGOING_EVENT != 0)
-        val channel=notifications.getNotificationChannel(notice.channelId)
-        assertNull(channel.sound); assertFalse(channel.shouldVibrate())
+        waitFor("ongoing notification") { shell("dumpsys notification --noredact").lineSequence().any { it.contains("NotificationRecord(") && it.contains("pkg=$target") } }
+        val dump=shell("dumpsys notification --noredact")
+        val record=dump.lineSequence().first { it.contains("NotificationRecord(") && it.contains("pkg=$target") }
+        val flags=Regex("flags=0x([0-9a-fA-F]+)").find(record)?.groupValues?.get(1)?.toInt(16) ?: 0
+        assertTrue(record,flags and android.app.Notification.FLAG_ONGOING_EVENT != 0)
+        val channel=dump.lineSequence().first { it.contains("NotificationChannel{") && it.contains("mId='silent_timetable'") }
+        assertTrue(channel,channel.contains("mSound=null"))
+        assertTrue(channel,channel.contains("mVibrationEnabled=false"))
         automation.executeShellCommand("cmd statusbar expand-notifications").use { android.os.ParcelFileDescriptor.AutoCloseInputStream(it).readBytes() }
         SystemClock.sleep(400);captureDevice("release-notification")
         automation.executeShellCommand("cmd statusbar collapse").use { android.os.ParcelFileDescriptor.AutoCloseInputStream(it).readBytes() }
+        val scenario=ActivityScenario.launch(WidgetHostActivity::class.java)
         val manager=AppWidgetManager.getInstance(context)
         val host=AppWidgetHost(context,9716)
         var original:Throwable?=null
@@ -111,7 +121,7 @@ class ReleaseSmokeTest {
                         putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,360);putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH,360)
                         putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,300);putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT,300)
                     }
-                    assertTrue(manager.bindAppWidgetIdIfAllowed(id,ComponentName(context.packageName,"${context.packageName}.system.$provider"),options))
+                    assertTrue(manager.bindAppWidgetIdIfAllowed(id,ComponentName(target,"$target.system.$provider"),options))
                     val activity=ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
                     view=host.createView(activity,id,manager.getAppWidgetInfo(id))
                     activity.setContentView(view)
@@ -132,6 +142,7 @@ class ReleaseSmokeTest {
         finally {
             runCatching { instrumentation.runOnMainSync { host.stopListening();host.deleteHost() } }
                 .onFailure { if(original==null) throw it }
+            scenario.close()
         }
     }
 }

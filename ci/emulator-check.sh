@@ -17,11 +17,11 @@ adb shell wm density 160
 adb shell wm dismiss-keyguard
 adb shell input keyevent 82
 adb shell mkdir -p /data/local/tmp/simpletimetable
-if ! ./gradlew "install${variant_task}" "install${variant_task}AndroidTest" "${gradle_args[@]}" --console=plain; then
+if ! ./gradlew ":app:install${variant_task}" ":app:install${variant_task}AndroidTest" "${gradle_args[@]}" --console=plain; then
   exit 1
 fi
 adb shell appwidget grantbind --package io.github.gaogaoza.simpletimetable --user 0
-if ./gradlew "connected${variant_task}AndroidTest" "${gradle_args[@]}" --console=plain; then
+if ./gradlew ":app:connected${variant_task}AndroidTest" "${gradle_args[@]}" --console=plain; then
   test_exit=0
 else
   test_exit=$?

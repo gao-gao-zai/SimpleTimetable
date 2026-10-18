@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <queries><package android:name="io.github.gaogaoza.simpletimetable" /></queries>
+    <application android:label="Release verifier" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <activity android:name=".WidgetHostActivity" android:exported="true" />
+    </application>
+</manifest>

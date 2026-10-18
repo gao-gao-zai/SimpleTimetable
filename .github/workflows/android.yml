@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'app/**'
+      - 'release-verifier/**'
       - 'ci/**'
       - '.github/workflows/android.yml'
       - '*.gradle.kts'
@@ -32,7 +33,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: false
-      - run: ./gradlew testDebugUnitTest testReleaseUnitTest lintDebug lintRelease assembleDebug assembleRelease
+      - run: ./gradlew :app:testDebugUnitTest :app:testReleaseUnitTest :app:lintDebug :app:lintRelease :app:assembleDebug :app:assembleRelease
       - uses: actions/upload-artifact@v4
         with:
           name: SimpleTimetable-debug
