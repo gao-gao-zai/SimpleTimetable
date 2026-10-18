@@ -36,6 +36,7 @@ class WidgetHostTest {
         }
         val manager=AppWidgetManager.getInstance(app); val host=AppWidgetHost(app,9715)
         val folder=compose.activity.getExternalFilesDir("acceptance")!!;folder.mkdirs()
+        var originalFailure:Throwable?=null
         try {
             compose.runOnUiThread { host.startListening() }
             for ((provider,label) in listOf(CourseWidget::class.java to "course-widget",TimetableWidget::class.java to "timetable-widget")) {
@@ -56,8 +57,9 @@ class WidgetHostTest {
                     compose.runOnUiThread { ready=if(provider==CourseWidget::class.java) view?.findViewById<TextView>(R.id.course_title)?.text=="语文" else (view?.findViewById<ListView>(R.id.widget_list)?.adapter?.count ?: 0)==6 }
                     ready
                 }
-                InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()?.let { bitmap -> File(folder,"$label.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it) };bitmap.recycle() }
+                captureDevice(label)
             }
-        } finally { compose.runOnUiThread { host.stopListening();host.deleteHost();SurfaceUpdater.update(app) } }
+        } catch(t:Throwable) { originalFailure=t;throw t }
+        finally { runCatching { compose.runOnUiThread { host.stopListening();host.deleteHost();SurfaceUpdater.update(app) } }.onFailure { if(originalFailure==null) throw it else android.util.Log.w("STTTest","Host cleanup failed after test failure",it) } }
     }
 }

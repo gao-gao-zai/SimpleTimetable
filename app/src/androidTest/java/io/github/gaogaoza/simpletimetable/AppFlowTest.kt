@@ -33,11 +33,7 @@ class AppFlowTest {
         if (compose.onAllNodesWithText(text).fetchSemanticsNodes().isEmpty()) compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(text))
         compose.onNodeWithText(text).performScrollTo().performClick(); compose.waitForIdle()
     }
-    private fun shot(name: String) {
-        val folder = compose.activity.getExternalFilesDir("acceptance")!!; folder.mkdirs()
-        val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
-        instrumentation.uiAutomation.takeScreenshot()?.let { bitmap -> File(folder,"$name.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it) }; bitmap.recycle() }
-    }
+    private fun shot(name: String) = captureDevice(name)
     @Test fun navigationTimelinePagingThemeAndDismiss() {
         compose.onNodeWithText("正在上课").assertExists(); shot("now-pink")
         compose.onNodeWithText("课表", useUnmergedTree = true).performClick(); compose.waitForIdle()
