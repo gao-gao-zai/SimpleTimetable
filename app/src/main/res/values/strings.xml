@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">简单课表</string>
+    <string name="course_widget">简单课表 · 课程卡片</string>
+    <string name="timetable_widget">简单课表 · 今日课表</string>
+    <string name="course_widget_description">当前课程、倒计时、进度和下一节</string>
+    <string name="timetable_widget_description">全天课程时间轴，支持上下滚动</string>
+    <string name="no_courses">今天没有课程</string>
+    <string name="open_today">查看今日课表</string>
+    <string name="today_timetable">今日课表</string>
+    <string name="open_timetable">查看完整课表</string>
+    <string name="progress_description">课程进度</string>
+</resources>
