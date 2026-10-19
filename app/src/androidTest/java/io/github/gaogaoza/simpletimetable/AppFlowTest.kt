@@ -96,7 +96,13 @@ class AppFlowTest {
         compose.onNodeWithText("时段名称").assertDoesNotExist()
         click("详细编辑")
         compose.onNodeWithText("时段名称").performScrollTo().performTextReplacement("第二节新名称")
-        androidx.test.espresso.Espresso.closeSoftKeyboard(); compose.waitForIdle()
+        compose.runOnUiThread {
+            if (android.os.Build.VERSION.SDK_INT >= 29) {
+                val ime = app.getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+                android.view.inspector.WindowInspector.getGlobalWindowViews().filter { it.hasWindowFocus() }.forEach { ime.hideSoftInputFromWindow(it.windowToken, 0) }
+            }
+        }
+        compose.waitForIdle()
         assertEquals("第 2 节", Repository(app).current.active().layouts.first().slots[1].name)
         click("返回整张时间表"); click("列表"); shot("layout-list-before-select")
         compose.onNodeWithContentDescription("时间表时间轴").assertDoesNotExist()
