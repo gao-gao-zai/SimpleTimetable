@@ -82,8 +82,9 @@ class ReleaseSmokeTest {
         click("上一天")
         waitFor("previous date") { node("10 月 12 日 · 周一") != null }
         captureDevice("release-timeline")
-        click("管理"); click("时间表"); click("秋季作息"); click("第 1 节"); click("开始时间")
-        click("增加分钟"); captureDevice("release-time-picker"); click("确定"); click("保存")
+        click("管理"); click("时间表"); click("秋季作息"); click("选择时段 第 1 节"); click("开始时间")
+        click("使用键盘输入时间"); click("增加分钟"); captureDevice("release-time-picker"); click("确定"); click("保存时间表")
+        click("秋季作息"); click("列表")
         waitFor("time picker saved both start and retained duration") {
             if (node("08:01 — 08:46") != null) true else {
                 allNodes().lastOrNull { it.isScrollable }?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
