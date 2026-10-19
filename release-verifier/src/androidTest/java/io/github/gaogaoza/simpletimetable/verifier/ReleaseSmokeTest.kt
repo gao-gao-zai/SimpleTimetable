@@ -64,7 +64,8 @@ class ReleaseSmokeTest {
                     SystemClock.sleep(350); return
                 }
             }
-            allNodes().lastOrNull { it.isScrollable }?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
+            // Reach the lower form before scrolling inside the nested timeline.
+            allNodes().firstOrNull { it.isScrollable }?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
             SystemClock.sleep(200)
         }
         fail("No clickable accessibility node: $label; visible=${allNodes().mapNotNull { it.text?.toString() }.take(50)}")
@@ -87,7 +88,8 @@ class ReleaseSmokeTest {
         click("秋季作息"); click("列表")
         waitFor("time picker saved both start and retained duration") {
             if (node("08:01 — 08:46") != null) true else {
-                allNodes().lastOrNull { it.isScrollable }?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
+                // Reach the lower form before scrolling inside the nested timeline.
+            allNodes().firstOrNull { it.isScrollable }?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
                 SystemClock.sleep(200); false
             }
         }
@@ -99,7 +101,8 @@ class ReleaseSmokeTest {
         click("管理"); click("显示与时间"); click("主题与阅读")
         waitFor("theme survives a fresh process") {
             if(node("#3568B0") != null) true else {
-                allNodes().lastOrNull { it.isScrollable }?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
+                // Reach the lower form before scrolling inside the nested timeline.
+            allNodes().firstOrNull { it.isScrollable }?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
                 SystemClock.sleep(200); false
             }
         }
