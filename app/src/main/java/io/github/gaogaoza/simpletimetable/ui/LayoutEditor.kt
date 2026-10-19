@@ -18,6 +18,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontWeight
@@ -38,9 +40,12 @@ import kotlin.math.max
     var addMenu by remember { mutableStateOf(false) }
     val square = LocalConfiguration.current.screenHeightDp <= 440
     val local = remember { EditForm() }
+    val focus = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    fun navigate(next: String) { focus.clearFocus(); keyboard?.hide(); detail = next }
     f.saveLabel = "保存时间表"
     f.submit = { app.repository.editProfile(p.id) { profileWithLayout(it, draft.layout) } }
-    BackHandler(detail.isNotBlank()) { detail = "" }
+    BackHandler(detail.isNotBlank()) { navigate("") }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(draft.layout.name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -50,27 +55,27 @@ import kotlin.math.max
             IconButton(onClick = { addMenu = true }) { Icon(Icons.Default.Add, "添加时段") }
             DropdownMenu(expanded = addMenu, onDismissRequest = { addMenu = false }) {
                 listOf(SlotType.LESSON to "上课", SlotType.BREAK to "课间", SlotType.DIVIDER to "分割线").forEach { (type, name) ->
-                    DropdownMenuItem(text = { Text(name) }, onClick = { addMenu = false; f.run { draft.insert(type); detail = ""; f.changed() } })
+                    DropdownMenuItem(text = { Text(name) }, onClick = { addMenu = false; f.run { draft.insert(type); navigate(""); f.changed() } })
                 }
             }
         }
-        IconButton(onClick = { detail = if (detail == "settings") "" else "settings" }) { Icon(Icons.Default.Settings, "时间表设置") }
+        IconButton(onClick = { navigate(if (detail == "settings") "" else "settings") }) { Icon(Icons.Default.Settings, "时间表设置") }
     }
     if (!square) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         listOf(SlotType.LESSON to "＋ 上课", SlotType.BREAK to "＋ 课间", SlotType.DIVIDER to "分割线").forEach { (type, name) ->
-            OutlinedButton(onClick = { f.run { draft.insert(type); detail = ""; f.changed() } }, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)) { Text(name, fontSize = 12.sp) }
+            OutlinedButton(onClick = { f.run { draft.insert(type); navigate(""); f.changed() } }, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)) { Text(name, fontSize = 12.sp) }
         }
     }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         listOf("timeline" to "时间轴", "list" to "列表").forEach { (key, name) ->
-            TextButton(onClick = { mode = key; detail = "" }, modifier = Modifier.weight(1f).semantics { selected = mode == key }, contentPadding = PaddingValues(horizontal = 4.dp)) {
+            TextButton(onClick = { mode = key; navigate("") }, modifier = Modifier.weight(1f).semantics { selected = mode == key }, contentPadding = PaddingValues(horizontal = 4.dp)) {
                 Text(name, color = if (mode == key) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             }
         }
-        IconButton(onClick = { draft.history(true); f.changed(); detail = "" }, enabled = draft.undo.isNotEmpty(), modifier = Modifier.size(40.dp)) { Icon(Icons.AutoMirrored.Filled.Undo, "撤销") }
-        IconButton(onClick = { draft.history(false); f.changed(); detail = "" }, enabled = draft.redo.isNotEmpty(), modifier = Modifier.size(40.dp)) { Icon(Icons.AutoMirrored.Filled.Redo, "重做") }
+        IconButton(onClick = { draft.history(true); f.changed(); navigate("") }, enabled = draft.undo.isNotEmpty(), modifier = Modifier.size(40.dp)) { Icon(Icons.AutoMirrored.Filled.Undo, "撤销") }
+        IconButton(onClick = { draft.history(false); f.changed(); navigate("") }, enabled = draft.redo.isNotEmpty(), modifier = Modifier.size(40.dp)) { Icon(Icons.AutoMirrored.Filled.Redo, "重做") }
     }
-    if (detail.isNotBlank()) TextButton(onClick = { detail = "" }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null); Text("返回整张时间表") }
+    if (detail.isNotBlank()) TextButton(onClick = { navigate("") }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null); Text("返回整张时间表") }
     when (detail) {
         "settings" -> {
             Input("时间表名称", draft.layout.name, f) { draft.update(draft.layout.copy(name = it)) }
@@ -104,8 +109,8 @@ import kotlin.math.max
                 } }
                 if (slot.type == SlotType.LESSON) Choice("未分配课程时的默认科目", slot.defaultSubject, listOf("" to "沿用时间表默认科目") + p.subjects.map { it.id to it.name }, f) { draft.updateSlot(slot.copy(defaultSubject = it)) }
                 LayoutSelection(draft, f, false) { }
-                Action("复制此时段") { f.run { draft.insert(slot.type, duplicate = true); detail = ""; f.changed() } }
-                Action("删除此时段", true) { f.ask("从共享时间表中删除「${slot.name}」？") { draft.delete(p); detail = ""; f.changed() } }
+                Action("复制此时段") { f.run { draft.insert(slot.type, duplicate = true); navigate(""); f.changed() } }
+                Action("删除此时段", true) { f.ask("从共享时间表中删除「${slot.name}」？") { draft.delete(p); navigate(""); f.changed() } }
             }
         }
         else -> {
@@ -134,7 +139,7 @@ import kotlin.math.max
                     }
                 }
             }
-            key(draft.selected) { LayoutSelection(draft, f, true) { detail = "slot" } }
+            key(draft.selected) { LayoutSelection(draft, f, true) { navigate("slot") } }
             if (draft.layout.slots.isEmpty()) Explanation("点添加时段，安排上课、课间或分割线。")
         }
     }
