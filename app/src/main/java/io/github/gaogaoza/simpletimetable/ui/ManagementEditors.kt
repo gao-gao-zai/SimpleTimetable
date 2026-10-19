@@ -21,39 +21,6 @@ import java.time.*
     }
 }
 
-@Composable fun LayoutEditor(app: TimetableApplication, p: Profile, editor: Editor.LayoutEdit, f: EditForm) {
-    val original = remember { p.layouts.firstOrNull { it.id == editor.id } ?: TimeLayout() }
-    val live = p.layouts.firstOrNull { it.id == original.id } ?: original
-    var name by remember { mutableStateOf(original.name) }; var minutes by remember { mutableIntStateOf(original.defaultMinutes) }; var defaultSubject by remember { mutableStateOf(original.defaultSubject) }
-    Input("时间表名称", name, f) { name = it }; NumberControl("默认课程时长", minutes, 1..720, f, "分钟", step = 5) { minutes = it }; Choice("默认科目", defaultSubject, listOf("" to "不设置默认科目") + p.subjects.map { it.id to it.name }, f) { defaultSubject = it }
-    if (editor.id.isNotEmpty()) {
-        Explanation("${p.plans.count { it.layoutId == live.id }} 份课表引用此时间表，修改时段会共同生效。")
-        live.slots.sortedBy { it.start }.forEach { slot -> SectionRow(slot.name, if (slot.type == SlotType.DIVIDER) "分割线" else "${clockText(slot.start)} — ${clockText(slot.end)}") { f.open(Editor.SlotEdit(live.id, slot.id)) } }
-        Action("新增时段") { f.open(Editor.SlotEdit(live.id)) }
-        Action("复制为独立时间表") { f.run { app.repository.editProfile(p.id) { it.copy(layouts = it.layouts + live.copy(id = newId(), name = live.name + " 副本")) }; f.close() } }
-        Action("删除时间表", true) { f.ask("删除这份时间表？") { require(p.plans.none { it.layoutId == live.id }) { "仍有课表引用此时间表，请先更换引用。" }; app.repository.editProfile(p.id) { it.copy(layouts = it.layouts.filterNot { l -> l.id == live.id }) }; f.close() } }
-    } else Explanation("保存时间表后即可添加课程、课间和分割线。")
-    f.submit = { val item = live.copy(name = requireName(name), defaultMinutes = minutes, defaultSubject = defaultSubject); app.repository.editProfile(p.id) { it.copy(layouts = if (editor.id.isEmpty()) it.layouts + item else it.layouts.map { l -> if (l.id == item.id) item else l }) } }
-    if (editor.id.isEmpty()) f.afterSave = { f.open(Editor.LayoutEdit(original.id)) }
-}
-
-@Composable fun SlotEditor(app: TimetableApplication, p: Profile, editor: Editor.SlotEdit, f: EditForm) {
-    val layout = p.layouts.first { it.id == editor.layout }; val end = layout.slots.filter { it.type != SlotType.DIVIDER }.maxOfOrNull { it.end } ?: 8 * 3600
-    val original = remember { layout.slots.firstOrNull { it.id == editor.id } ?: TimeSlot(name = "新时段", start = end.coerceAtMost(23 * 3600), end = (end + layout.defaultMinutes * 60).coerceAtMost(86400)) }
-    var name by remember { mutableStateOf(original.name) }; var start by remember { mutableIntStateOf(original.start) }; var finish by remember { mutableIntStateOf(original.end) }; var type by remember { mutableStateOf(original.type.name) }; var default by remember { mutableStateOf(original.defaultSubject) }
-    Input("时段名称", name, f) { name = it }; Choice("类型", type, listOf("LESSON" to "上课", "BREAK" to "课间", "DIVIDER" to "分割线"), f) { type = it }; TimeControl("开始时间", start, f) { val duration = finish - start; start = it; if (duration > 0) finish = (it + duration).coerceAtMost(86400) }; if (type != "DIVIDER") { TimeControl("结束时间", finish, f, allowMidnightEnd = true) { finish = it }; Explanation(if (finish > start) "时长 ${(finish - start) / 60} 分 ${(finish - start) % 60} 秒" else "结束时间需要晚于开始时间") }
-    if (type == "LESSON") Choice("默认科目", default, listOf("" to "使用时间表默认科目") + p.subjects.map { it.id to it.name }, f) { default = it }
-    f.submit = {
-        val kind = SlotType.valueOf(type); val item = original.copy(name = requireName(name), start = start, end = if (kind == SlotType.DIVIDER) start else finish, type = kind, defaultSubject = default)
-        app.repository.editProfile(p.id) { profile -> profile.copy(layouts = profile.layouts.map { if (it.id == layout.id) it.copy(slots = (it.slots.filterNot { s -> s.id == item.id } + item).sortedBy { s -> s.start }) else it }, plans = profile.plans.map { q -> if (q.layoutId == layout.id && kind != SlotType.LESSON) q.copy(subjects = q.subjects - item.id, disabledSlots = q.disabledSlots - item.id) else q }) }
-    }
-    f.afterSave = { f.open(Editor.LayoutEdit(layout.id)) }
-    if (editor.id.isNotEmpty()) Action("删除共享时段", true) { f.ask("所有引用此时间表的课表都会移除此时段，继续？") {
-        require(p.temporary.none { t -> t.patches.any { patch -> patch.slotId == original.id && p.plans.any { it.id == patch.planId && it.layoutId == layout.id } } }) { "临时安排仍引用此时段，请先撤销对应安排。" }
-        app.repository.editProfile(p.id) { it.copy(layouts = it.layouts.map { l -> if (l.id == layout.id) l.copy(slots = l.slots.filterNot { s -> s.id == original.id }) else l }, plans = it.plans.map { q -> if (q.layoutId == layout.id) q.copy(subjects = q.subjects - original.id, disabledSlots = q.disabledSlots - original.id) else q }) }; f.close()
-    } }
-}
-
 @Composable fun PlanEditor(app: TimetableApplication, p: Profile, editor: Editor.PlanEdit, f: EditForm) {
     if (p.layouts.isEmpty()) { Explanation("请先创建时间表。") ; return }
     val original = remember { p.plans.firstOrNull { it.id == editor.id } ?: ClassPlan(layoutId = p.layouts.first().id, groupId = p.groups.first().id) }

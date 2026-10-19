@@ -1,6 +1,6 @@
 # 简单课表 / SimpleTimetable
 
-离线、免账号的原生 Android 课表应用。Kotlin + Jetpack Compose，面向普通手机竖屏与非 Wear OS Android 手表，最低 Android 8.0（API 26）。当前版本为 0.1.1，设计以已确认的 v18 原型为准。
+离线、免账号的原生 Android 课表应用。Kotlin + Jetpack Compose，面向普通手机竖屏与非 Wear OS Android 手表，最低 Android 8.0（API 26）。当前版本为 0.1.2，设计以已确认的 v22 原型为准。
 
 - 科目、共享时间表、课表群、按星期与多周轮换的课表管理。
 - 实际启用和浏览编辑分离；单节替换、跨日交换、临时整张课表与临时层，保存后生效并按有效期失效。

@@ -77,17 +77,8 @@ import java.util.Locale
 @Composable fun TimeControl(label: String, value: Int, form: EditForm, allowMidnightEnd: Boolean = false, onChange: (Int) -> Unit) {
     var open by remember { mutableStateOf(false) }
     PickerRow(label, clockText(value), Icons.Default.Schedule) { open = true }
-    if (open) {
-        var hour by remember { mutableIntStateOf(value / 3600) }; var minute by remember { mutableIntStateOf(value % 3600 / 60) }; var second by remember { mutableIntStateOf(value % 60) }
-        val local = remember { EditForm() }
-        PickerDialog(label, { open = false }, { form.changed(); onChange(hour * 3600 + minute * 60 + second); open = false }) {
-            Text(clockText(hour * 3600 + minute * 60 + second), style = MaterialTheme.typography.headlineMedium)
-            NumberControl("小时", hour, 0..if (allowMidnightEnd) 24 else 23, local, "时") { hour = it; if (it == 24) { minute = 0; second = 0 } }
-            if (hour < 24) {
-                NumberControl("分钟", minute, 0..59, local, "分") { minute = it }
-                NumberControl("秒", second, 0..59, local, "秒") { second = it }
-            } else Explanation("24:00 表示当天结束。")
-        }
+    if (open) ClockPicker(label, value, allowMidnightEnd, { open = false }) {
+        form.changed(); onChange(it); open = false
     }
 }
 
@@ -179,16 +170,29 @@ fun hsvColor(hue: Float, saturation: Float, brightness: Float): String = String.
         var hsv by remember { mutableStateOf(FloatArray(3).also { android.graphics.Color.colorToHSV(android.graphics.Color.parseColor(value), it) }) }
         var emitted by remember { mutableStateOf(value) }
         LaunchedEffect(value) { if (!value.equals(emitted, true)) hsv = FloatArray(3).also { android.graphics.Color.colorToHSV(android.graphics.Color.parseColor(value), it) } }
-        fun set(index: Int, n: Float) { val next = hsv.copyOf(); next[index] = n; hsv = next; emitted = hsvColor(next[0], next[1], next[2]); form.changed(); onChange(emitted) }
-        Text("色相", style = MaterialTheme.typography.labelLarge)
-        Row(Modifier.fillMaxWidth().height(12.dp)) { (0 until 36).forEach { h -> Box(Modifier.weight(1f).fillMaxHeight().background(Color(android.graphics.Color.HSVToColor(floatArrayOf(h * 10f, .8f, .8f))))) } }
-        Slider(hsv[0], { set(0, it) }, valueRange = 0f..359.9f, modifier = Modifier.semantics { contentDescription = "色相" })
-        Text("饱和度", style = MaterialTheme.typography.labelLarge); Slider(hsv[1], { set(1, it) }, modifier = Modifier.semantics { contentDescription = "饱和度" })
-        Text("明亮度", style = MaterialTheme.typography.labelLarge); Slider(hsv[2], { set(2, it) }, modifier = Modifier.semantics { contentDescription = "明亮度" })
-        TextButton(onClick = { code = true }) { Text("输入颜色代码") }
+        ColorPanel(hsv) { next ->
+            hsv = next; emitted = hsvColor(next[0], next[1], next[2]); form.changed(); onChange(emitted)
+        }
+        TextButton(onClick = { code = true }) { Text("HEX / RGB 数值") }
     }
+
     if (code) {
-        var hex by remember { mutableStateOf(value) }; var error by remember { mutableStateOf(false) }
-        AlertDialog(onDismissRequest = { code = false }, title = { Text("颜色代码") }, text = { OutlinedTextField(hex, { hex = it; error = false }, label = { Text("#RRGGBB") }, singleLine = true, isError = error, supportingText = { if (error) Text("例如 #B34E78") }) }, confirmButton = { TextButton(onClick = { if (hex.matches(Regex("#[0-9a-fA-F]{6}"))) { form.changed(); onChange(hex.uppercase(Locale.ROOT)); code = false } else error = true }) { Text("确定") } }, dismissButton = { TextButton(onClick = { code = false }) { Text("取消") } })
+        var hex by remember { mutableStateOf(value) }; var error by remember { mutableStateOf(false) }; var rgb by remember { mutableStateOf(false) }
+        val initial = remember { android.graphics.Color.parseColor(value) }
+        var red by remember { mutableStateOf(android.graphics.Color.red(initial).toString()) }; var green by remember { mutableStateOf(android.graphics.Color.green(initial).toString()) }; var blue by remember { mutableStateOf(android.graphics.Color.blue(initial).toString()) }
+        AlertDialog(onDismissRequest = { code = false }, title = { Text("颜色数值") }, text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row { FilterChip(selected = !rgb, onClick = { rgb = false; error = false }, label = { Text("HEX") }); Spacer(Modifier.width(8.dp)); FilterChip(selected = rgb, onClick = { rgb = true; error = false }, label = { Text("RGB") }) }
+                if (!rgb) OutlinedTextField(hex, { hex = it; error = false }, label = { Text("#RRGGBB") }, singleLine = true, isError = error)
+                else listOf(Triple("红 R", red, { v: String -> red = v }), Triple("绿 G", green, { v: String -> green = v }), Triple("蓝 B", blue, { v: String -> blue = v })).forEach { (label, channel, change) ->
+                    OutlinedTextField(channel, { change(it); error = false }, label = { Text(label) }, singleLine = true, isError = error, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                }
+                if (error) Text(if (rgb) "每个通道请输入 0 — 255 的整数" else "请输入 #RRGGBB，例如 #B34E78", color = MaterialTheme.colorScheme.error)
+            }
+        }, confirmButton = { TextButton(onClick = {
+            val channels = listOf(red, green, blue).map { it.toIntOrNull() }
+            val next = if (rgb) if (channels.all { it != null && it in 0..255 }) "#%02X%02X%02X".format(channels[0], channels[1], channels[2]) else null else hex.takeIf { it.matches(Regex("#[0-9a-fA-F]{6}")) }
+            if (next != null) { form.changed(); onChange(next.uppercase(Locale.ROOT)); code = false } else error = true
+        }) { Text("确定") } }, dismissButton = { TextButton(onClick = { code = false }) { Text("取消") } })
     }
 }

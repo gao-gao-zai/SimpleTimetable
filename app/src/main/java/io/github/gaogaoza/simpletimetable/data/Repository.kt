@@ -51,7 +51,7 @@ class Repository(context: Context) {
                 require(p.activeGroup.isEmpty() || p.groups.any { it.id == p.activeGroup }) { "启用的课表群不存在" }
                 require(p.temporary.map { it.id }.distinct().size == p.temporary.size) { "临时安排标识重复" }
                 p.layouts.forEach { l ->
-                    require(l.name.isNotBlank() && l.defaultMinutes in 1..720) { "时间表名称或默认时长无效" }
+                    require(l.name.isNotBlank() && l.defaultMinutes in 1..720 && l.defaultBreakMinutes in 1..720) { "时间表名称或默认时长无效" }
                     require(l.defaultSubject.isEmpty() || p.subjects.any { it.id == l.defaultSubject }) { "默认科目不存在" }
                     require(l.slots.all { slot -> slot.defaultSubject.isEmpty() || p.subjects.any { it.id == slot.defaultSubject } }) { "时段默认科目不存在" }
                     require(l.slots.map { it.id }.distinct().size == l.slots.size) { "时段标识重复" }

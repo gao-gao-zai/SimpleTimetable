@@ -44,7 +44,6 @@ import java.time.*
 sealed interface Editor {
     data class SubjectEdit(val id: String = "") : Editor
     data class LayoutEdit(val id: String = "") : Editor
-    data class SlotEdit(val layout: String, val id: String = "") : Editor
     data class PlanEdit(val id: String = "") : Editor
     data class PlanItems(val id: String) : Editor
     data class GroupEdit(val id: String = "") : Editor

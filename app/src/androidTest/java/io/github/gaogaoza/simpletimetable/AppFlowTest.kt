@@ -70,12 +70,12 @@ class AppFlowTest {
     }
     @Test fun timetableAndTemporaryCanBeEditedWithPickers() {
         compose.onNodeWithText("管理",useUnmergedTree=true).performClick(); compose.waitForIdle()
-        click("时间表"); click("秋季作息"); click("第 1 节"); click("开始时间")
+        click("时间表"); click("秋季作息"); compose.onNodeWithContentDescription("选择时段 第 1 节").performScrollTo().performClick(); click("开始时间")
+        compose.onNodeWithContentDescription("使用键盘输入时间").performScrollTo().performClick()
         compose.onNodeWithContentDescription("增加分钟").performScrollTo().performClick(); compose.waitForIdle()
-        shot("time-picker"); click("确定"); click("保存")
+        shot("time-picker"); click("确定"); click("保存时间表")
         val slot = Repository(app).current.active().layouts.first().slots.first()
         assertEquals(8 * 3600 + 60, slot.start); assertEquals(8 * 3600 + 46 * 60, slot.end)
-        compose.onNodeWithContentDescription("关闭").performClick()
         compose.waitUntil(5000) { compose.onAllNodesWithContentDescription("关闭").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithContentDescription("返回管理").performClick(); compose.waitForIdle()
         click("临时安排"); click("新建临时安排")
@@ -86,6 +86,33 @@ class AppFlowTest {
         val temporary = Repository(app).current.active().temporary.single()
         assertEquals("运动会", temporary.name)
         assertEquals(date.plusDays(2), Instant.ofEpochMilli(temporary.endMillis).atZone(ZoneId.systemDefault()).toLocalDate())
+    }
+    @Test fun selectingTimelineOrListUpdatesLowerDraftWithoutOpeningDetails() {
+        compose.onNodeWithText("管理", useUnmergedTree = true).performClick(); compose.waitForIdle()
+        click("时间表"); click("秋季作息")
+        compose.onNodeWithContentDescription("时间表时间轴").performScrollTo()
+        compose.onNodeWithContentDescription("选择时段 第 2 节").performScrollTo().performClick(); compose.waitForIdle()
+        compose.onNode(hasText("开始时间") and hasText("09:00")).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("时段名称").assertDoesNotExist()
+        click("详细编辑")
+        compose.onNodeWithText("时段名称").performScrollTo().performTextReplacement("第二节新名称")
+        assertEquals("第 2 节", Repository(app).current.active().layouts.first().slots[1].name)
+        click("返回整张时间表"); click("列表")
+        compose.onNodeWithContentDescription("选择时段 第 1 节").performScrollTo().performClick(); compose.waitForIdle()
+        compose.onNodeWithText("时段名称").assertDoesNotExist()
+        compose.onNode(hasText("开始时间") and hasText("08:00")).performScrollTo().assertIsDisplayed()
+        shot("layout-list-selection"); click("保存时间表")
+        assertEquals("第二节新名称", Repository(app).current.active().layouts.first().slots[1].name)
+    }
+    @Test fun clockDialSelectsSecondsWithoutKeyboard() {
+        compose.onNodeWithText("管理", useUnmergedTree = true).performClick(); compose.waitForIdle()
+        click("时间表"); click("秋季作息"); click("开始时间")
+        compose.onNodeWithContentDescription("8时").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("0分").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("选择秒").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("秒钟面").performScrollTo().performTouchInput { click(androidx.compose.ui.geometry.Offset(width * .5f, height * .9f)) }
+        shot("analog-clock"); click("确定"); click("保存时间表")
+        assertEquals(8 * 3600 + 30, Repository(app).current.active().layouts.first().slots.first().start)
     }
     @Test fun customColorCanBePickedWithoutTypingHex() {
         compose.onNodeWithText("管理",useUnmergedTree=true).performClick(); compose.waitForIdle()

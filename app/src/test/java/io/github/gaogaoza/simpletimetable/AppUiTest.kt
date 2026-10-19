@@ -56,16 +56,18 @@ class AppUiTest {
         compose.onNodeWithText("管理",useUnmergedTree=true).performClick()
         compose.onNodeWithText("时间表").performScrollTo().performClick()
         compose.onNodeWithText("秋季作息").performClick()
-        compose.onNodeWithText("第 1 节").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("选择时段 第 1 节").performScrollTo().performClick()
         compose.onNodeWithText("开始时间").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("选择分钟").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("使用键盘输入时间").performScrollTo().performClick()
         compose.onNodeWithContentDescription("增加分钟").performScrollTo().performClick()
         capture("time-picker", dialog = true)
         compose.onNodeWithText("确定").performClick()
-        compose.onNodeWithText("保存").performClick()
+        compose.onNodeWithText("保存时间表").performClick()
         val slot = Repository(app).current.active().layouts.first().slots.first()
         assertEquals(8 * 3600 + 60, slot.start)
         assertEquals(8 * 3600 + 46 * 60, slot.end)
-        compose.onNodeWithText("新增时段").performScrollTo().assertExists()
+        compose.onNodeWithText("秋季作息").assertExists()
     }
     @Test @Config(qualifiers="w274dp-h335dp-hdpi") fun smallWatchCalendarHasSelectableDates() {
         compose.onNodeWithText("课表",useUnmergedTree=true).performClick()
@@ -109,6 +111,62 @@ class AppUiTest {
         val plan = Repository(app).current.active().plans.first()
         assertEquals(2, plan.cycle)
         assertEquals("2026-10-12", plan.anchor)
+    }
+    private fun openLayout() {
+        compose.onNodeWithText("管理", useUnmergedTree = true).performClick()
+        compose.onNodeWithText("时间表").performScrollTo().performClick()
+        compose.onNodeWithText("秋季作息").performClick()
+    }
+    private fun checkSelectionAndDraft() {
+        openLayout()
+        capture("layout-timeline", dialog = true)
+        compose.onNodeWithContentDescription("时间表时间轴").performScrollTo()
+        compose.onNodeWithContentDescription("选择时段 第 2 节").performScrollTo().performClick()
+        compose.onNode(hasText("开始时间") and hasText("09:00")).performScrollTo().assertExists()
+        compose.onNodeWithText("时段名称").assertDoesNotExist()
+        compose.onNodeWithText("详细编辑").performScrollTo().performClick()
+        compose.onNodeWithText("时段名称").performScrollTo().performTextReplacement("第二节新名称")
+        assertEquals("第 2 节", Repository(app).current.active().layouts.first().slots[1].name)
+        compose.onNodeWithText("返回整张时间表").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("时间表时间轴").assertExists()
+        compose.onNodeWithText("列表", substring = false).performScrollTo().performClick()
+        compose.onNodeWithContentDescription("选择时段 第 1 节").performScrollTo().performClick()
+        compose.onNodeWithText("时段名称").assertDoesNotExist()
+        compose.onNode(hasText("开始时间") and hasText("08:00")).performScrollTo().assertExists()
+        capture("layout-selection", dialog = true)
+        compose.onNodeWithText("保存时间表").performClick()
+        assertEquals("第二节新名称", Repository(app).current.active().layouts.first().slots[1].name)
+    }
+    @Test @Config(qualifiers="w411dp-h891dp-mdpi") fun phoneSelectionOnlyUpdatesLowerEditor() = checkSelectionAndDraft()
+    @Test @Config(qualifiers="w274dp-h335dp-hdpi") fun watchSelectionOnlyUpdatesLowerEditor() = checkSelectionAndDraft()
+    @Test @Config(qualifiers="w410dp-h410dp-mdpi") fun squareSelectionOnlyUpdatesLowerEditor() = checkSelectionAndDraft()
+    @Test fun clockDialSecondsAndDraftSaveAreNative() {
+        openLayout()
+        compose.onNodeWithText("开始时间").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("8时").performClick()
+        compose.onNodeWithContentDescription("0分").performClick()
+        compose.onNodeWithContentDescription("选择秒").performClick()
+        compose.onNodeWithContentDescription("秒钟面").performTouchInput { click(androidx.compose.ui.geometry.Offset(width * .5f, height * .9f)) }
+        capture("clock-dial", dialog = true)
+        compose.onNodeWithText("确定").performClick()
+        compose.onNode(hasText("开始时间") and hasText("08:00:30")).performScrollTo().assertExists()
+        assertEquals(8 * 3600, Repository(app).current.active().layouts.first().slots.first().start)
+        compose.onNodeWithText("保存时间表").performClick()
+        val saved = Repository(app).current.active().layouts.first().slots.first()
+        assertEquals(8 * 3600 + 30, saved.start); assertEquals(8 * 3600 + 45 * 60 + 30, saved.end)
+    }
+    @Test fun colorSquareUsesTwoDimensionsAndSavesOnlyExplicitly() {
+        compose.onNodeWithText("管理", useUnmergedTree = true).performClick()
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("显示与时间"))
+        compose.onNodeWithText("显示与时间").performClick()
+        compose.onNodeWithText("主题与阅读").performScrollTo().performClick()
+        compose.onNodeWithText("自选颜色").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("二维取色板").performScrollTo().performTouchInput { swipe(androidx.compose.ui.geometry.Offset(width * .2f, height * .2f), androidx.compose.ui.geometry.Offset(width * .8f, height * .5f)) }
+        compose.onNodeWithContentDescription("色相").performScrollTo().performTouchInput { click(androidx.compose.ui.geometry.Offset(width * .9f, height / 2f)) }
+        assertEquals("#355E45", Repository(app).current.settings.seed)
+        capture("color-panel", dialog = true)
+        compose.onNodeWithText("保存").performClick()
+        assertNotEquals("#355E45", Repository(app).current.settings.seed)
     }
     private fun capture(name:String, dialog:Boolean = false) {
         compose.runOnIdle {
