@@ -63,6 +63,12 @@ class SyncStoreTest {
         val (repo, store) = setup(); store.stage(store.offer(repo.current.active().copy(name = "合成接收版"))); repo.editProfile(repo.current.active().id) { it.copy(name = "合成本地更改") }
         assertThrows(IllegalArgumentException::class.java) { store.accept("replace") }; assertEquals("合成本地更改", repo.current.active().name)
     }
+    @Test fun replacementOfferCannotBypassPreviewConfirmation() {
+        val (repo, store) = setup(); val first = store.offer(repo.current.active().copy(name = "合成第一次预览")); store.stage(first)
+        store.stage(store.offer(repo.current.active().copy(name = "合成第二次接收")))
+        assertThrows(IllegalArgumentException::class.java) { store.accept("replace", first["nonce"].asString) }
+        assertEquals("合成测试", repo.current.active().name)
+    }
     @Test fun copyPreservesUnknownMetadataAndLocalActivation() {
         val (repo, store) = setup(); val originalId = repo.current.activeProfile; val m = store.offer(repo.current.active()); val raw = m["profile"].asJsonObject
         raw.add("futureMetadata", JsonObject().apply { addProperty("synthetic", true) }); raw["subjects"].asJsonArray[0].asJsonObject.addProperty("futureSubject", "synthetic-only")

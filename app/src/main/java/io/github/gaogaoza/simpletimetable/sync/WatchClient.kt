@@ -19,11 +19,11 @@ import java.util.ArrayDeque
 class WatchClient(private val context: Context, private val repository: Repository) {
     data class Device(val address: String, val name: String)
     data class PeerProfile(val id: String, val name: String, val revision: String)
-    data class View(val status: String = "在手表开启同步后扫描", val scanning: Boolean = false, val paired: Boolean = false, val devices: List<Device> = emptyList(), val profiles: List<PeerProfile> = emptyList(), val pending: String? = null, val suggestion: String = "", val progress: Int = 0)
+    data class View(val status: String = "在手表开启同步后扫描", val scanning: Boolean = false, val paired: Boolean = false, val devices: List<Device> = emptyList(), val profiles: List<PeerProfile> = emptyList(), val pending: String? = null, val pendingNonce: String = "", val suggestion: String = "", val progress: Int = 0)
     private val thread = HandlerThread("watch-sync").apply { start() }
     private val handler = Handler(thread.looper)
     private val store = SyncStore(context, repository)
-    private val mutable = MutableStateFlow(View(pending = store.summary(), suggestion = store.suggestion()))
+    private val mutable = MutableStateFlow(View(pending = store.summary(), pendingNonce = store.meta["pending"]?.asJsonObject?.get("message")?.asJsonObject?.get("nonce")?.asString ?: "", suggestion = store.suggestion()))
     val view = mutable.asStateFlow()
     private val adapter get() = context.getSystemService(BluetoothManager::class.java)?.adapter
     private var gatt: BluetoothGatt? = null
@@ -102,6 +102,7 @@ class WatchClient(private val context: Context, private val repository: Reposito
         if (g !== gatt || characteristic.uuid != UUID.fromString(Wire.TX)) return@action
         val f = Wire.decode(bytes)
         if (f.op == Wire.ACK) { if (current?.ack(bytes) == true) pump(); return@action }
+        if (f.id !in receivers && receivers.size >= 6) receivers.remove(receivers.keys.first())
         val receiver = receivers.getOrPut(f.id) { Wire.Receiver(store.loadTransfer(f.id), { store.saveTransfer(f.id, it) }, ::deliver) }
         sendRaw(receiver.receive(bytes))
     }
@@ -158,7 +159,7 @@ class WatchClient(private val context: Context, private val repository: Reposito
             "OFFER" -> {
                 val receipt = store.meta["receipts"].asJsonArray.firstOrNull { it.asJsonObject["offerNonce"].asString == m["nonce"].asString }
                 if (receipt != null) enqueue(receipt.asJsonObject)
-                else { store.stage(m); change { it.copy(pending = store.summary(), suggestion = store.suggestion(), status = "已接收，请预览确认保存") } }
+                else { store.stage(m); change { it.copy(pending = store.summary(), pendingNonce = m["nonce"].asString, suggestion = store.suggestion(), status = "已接收，请预览确认保存") } }
             }
             "SAVED" -> {
                 val out = store.meta["outbox"]?.asJsonObject ?: error("没有待确认发送")
@@ -172,7 +173,7 @@ class WatchClient(private val context: Context, private val repository: Reposito
     private fun sendProfileNow(p: Profile) { check(mutable.value.paired) { "请先连接手表" }; val m = store.offer(p); store.update { it.add("outbox", m) }; enqueue(m); report("发送中；等待手表预览确认保存") }
     fun sendProfile(id: String) = action { sendProfileNow(repository.current.profiles.first { it.id == id }) }
     fun pull(id: String) = action { check(mutable.value.paired); enqueue(SyncStore.message("PULL").apply { addProperty("profileId", id) }); report("等待手表发送档案") }
-    fun accept(choice: String) = action { val receipt = store.accept(choice); if (mutable.value.paired) enqueue(receipt); change { it.copy(pending = null, suggestion = "", status = "选择已保存；落盘后才发送回执") } }
+    fun accept(choice: String, expectedNonce: String) = action { val receipt = store.accept(choice, expectedNonce); if (mutable.value.paired) enqueue(receipt); change { it.copy(pending = null, pendingNonce = "", suggestion = "", status = "选择已保存；落盘后才发送回执") } }
     fun disconnect() = action { disconnectNow(); report("同步已结束") }
     private fun disconnectNow() {
         stopScan(); ++timeoutGeneration; subscribed = false; code = ""; writing = false; rx = null

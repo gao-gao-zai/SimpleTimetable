@@ -253,11 +253,11 @@ fun openLesson(session: UiSession, profile: Profile, date: LocalDate, lesson: Le
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
         item { InactiveProfile(profile, db) }
         val entries = listOf(
-            Triple("watchSync", "手表同步", "BlueOS · 双向完整档案 · 预览确认"),
             Triple("profiles", "档案", profile.name + if (profile.id == db.active().id) " · 当前启用" else " · 当前运行 ${db.active().name}"),
             Triple("subjects", "科目", "${profile.subjects.size} 个 · 名称、教师与颜色"), Triple("layouts", "时间表", "${profile.layouts.size} 份 · 时段与共享引用"),
             Triple("plans", "课表", "${profile.plans.size} 份 · 日期与多周规则"), Triple("groups", "课表群与启用", "自动、手动与临时覆盖"), Triple("temporary", "临时安排", "${profile.temporary.size} 项 · 有效期与调课"),
-            Triple("import", "导入课表", "ClassIsland、Excel 和 CSV"), Triple("settings", "显示与时间", "主题、字号与时间校准"), Triple("external", "通知与小组件", "课程卡片与今日课表")
+            Triple("import", "导入课表", "ClassIsland、Excel 和 CSV"), Triple("settings", "显示与时间", "主题、字号与时间校准"), Triple("external", "通知与小组件", "课程卡片与今日课表"),
+            Triple("watchSync", "手表同步", "BlueOS · 双向完整档案 · 预览确认")
         )
         items(entries) { (page, title, sub) -> SectionRow(title, sub, when (page) { "profiles" -> Icons.Default.Folder; "subjects" -> Icons.Default.MenuBook; "layouts" -> Icons.Default.Schedule; "plans" -> Icons.Default.DateRange; "groups" -> Icons.Default.Layers; "temporary" -> Icons.Default.SwapHoriz; "import" -> Icons.Default.FileDownload; "settings" -> Icons.Default.Settings; else -> Icons.Default.Widgets }) { session.page = page } }
     }

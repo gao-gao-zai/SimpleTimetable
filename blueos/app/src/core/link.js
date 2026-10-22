@@ -27,6 +27,7 @@ export class Link {
     this.chain = this.chain.then(async () => {
       const f = decode(copy)
       if (f.op === OP.ACK) { if (this.current && this.current.ack(copy)) this.pump(); return }
+      if (!this.receivers[f.id] && Object.keys(this.receivers).length >= 6) delete this.receivers[Object.keys(this.receivers)[0]]
       if (!this.receivers[f.id]) this.receivers[f.id] = new Receiver(await this.load(f.id), s => this.save(f.id, s), this.deliver)
       const ack = await this.receivers[f.id].receive(copy)
       this.sendRaw(ack)

@@ -41,8 +41,9 @@ import io.github.gaogaoza.simpletimetable.sync.WatchClient
             state.profiles.forEach { p -> item(key = "pull-${p.id}") { OutlinedButton(onClick = { client.pull(p.id) }, modifier = Modifier.fillMaxWidth()) { Text("接收 ${p.name}") } } }
         }
         state.pending?.let { summary ->
+            val previewNonce = state.pendingNonce
             item { HorizontalDivider(); Text("接收预览", style = MaterialTheme.typography.titleMedium); Text(summary); Text(when(state.suggestion) { "same" -> "版本相同"; "receive" -> "仅手表版变化，建议接收"; "send" -> "仅手机版变化，建议保留手机版"; "conflict" -> "双端均已修改，请明确选择；不会逐节自动合并"; else -> "首次同步，请明确选择版本" }) }
-            listOf("replace" to "保存手表版", "keep" to "保留手机版", "copy" to "手表版另存副本").forEach { (choice, label) -> item { Button(onClick = { confirm = "$label？保存完成后才发送回执。" to { client.accept(choice) } }, modifier = Modifier.fillMaxWidth()) { Text(label) } } }
+            listOf("replace" to "保存手表版", "keep" to "保留手机版", "copy" to "手表版另存副本").forEach { (choice, label) -> item { Button(onClick = { confirm = "$label？保存完成后才发送回执。" to { client.accept(choice, previewNonce) } }, modifier = Modifier.fillMaxWidth()) { Text(label) } } }
         }
         item { OutlinedButton(onClick = { client.disconnect() }, modifier = Modifier.fillMaxWidth()) { Text("结束同步") }; Text("断连后重新连接同一手表可恢复已保存分包。没有收到对端保存回执时，请勿视为同步完成。GT2 无线互通仍待真机验证。", style = MaterialTheme.typography.bodySmall) }
     }

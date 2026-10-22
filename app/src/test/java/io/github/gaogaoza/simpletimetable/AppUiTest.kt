@@ -112,6 +112,13 @@ class AppUiTest {
         assertEquals(2, plan.cycle)
         assertEquals("2026-10-12", plan.anchor)
     }
+    @Test fun watchSyncEntryIsReachableFromManagement() {
+        compose.onNodeWithText("管理", useUnmergedTree = true).performClick()
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("手表同步"))
+        compose.onNodeWithText("手表同步").performClick()
+        compose.onNodeWithText("BlueOS 手表同步").assertExists()
+        compose.onNodeWithText("扫描手表").assertExists()
+    }
     private fun openLayout() {
         compose.onNodeWithText("管理", useUnmergedTree = true).performClick()
         compose.onNodeWithText("时间表").performScrollTo().performClick()

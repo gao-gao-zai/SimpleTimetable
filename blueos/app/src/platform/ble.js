@@ -41,11 +41,12 @@ export async function sendProfile(p) {
   if (!paired) throw Error('请先连接手机')
   const m = offer(p, nonce()); await save(d => { d.outbox = m }); send(m); inform('等待手机预览确认保存')
 }
-export async function decide(choice) {
+export async function decide(choice, expectedNonce) {
   if (!db.pending) throw Error('没有待确认档案')
   const pending = db.pending, m = pending.message
+  if (m.nonce !== expectedNonce) throw Error('收到的档案已更新，请重新预览')
   const receipt = { offerNonce: m.nonce, profileId: m.profile.id, revision: m.revision, choice }
-  await save(d => { d.profiles = accept(d.profiles, pending, choice); if (choice === 'replace') d.common[m.profile.id] = m.revision; d.receipts = d.receipts.concat(receipt).slice(-32); d.pending = null })
+  await save(d => { d.profiles = accept(d.profiles, pending, choice, expectedNonce); if (choice === 'replace') d.common[m.profile.id] = m.revision; d.receipts = d.receipts.concat(receipt).slice(-32); d.pending = null })
   if (paired) send({ type: 'SAVED', ...receipt })
   inform(choice === 'keep' ? '已保留手表版' : '已保存；已落盘后才发送回执')
 }

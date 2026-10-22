@@ -17,8 +17,10 @@ export function preview(message, local, base) {
   const p = message.profile
   return { message, localRevision: local ? revision(local) : null, direction: local ? direction(revision(local), message.revision, base) : 'receive', summary: `${p.name} · ${p.subjects.length} 科目 / ${p.layouts.length} 作息 / ${p.plans.length} 课表 / ${p.temporary.length} 临时安排` }
 }
-export function accept(profiles, pending, choice) {
-  const m = pending.message, incoming = clone(m.profile), local = profiles.find(p => p.id === incoming.id)
+export function accept(profiles, pending, choice, expectedNonce = pending.message.nonce) {
+  const m = pending.message
+  if (m.nonce !== expectedNonce) throw Error('收到的档案已更新，请重新预览')
+  const incoming = clone(m.profile), local = profiles.find(p => p.id === incoming.id)
   if (local && revision(local) !== pending.localRevision) throw Error('预览后本机已修改，请重新预览')
   if (choice === 'keep') return clone(profiles)
   if (choice === 'copy') { incoming.id = id(); incoming.name += ' 接收副本'; return profiles.concat(incoming) }

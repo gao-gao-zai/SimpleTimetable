@@ -50,9 +50,10 @@ class SyncStore(context: Context, private val repository: Repository) {
         val m = pending["message"].asJsonObject; val p = m["profile"].asJsonObject; val local = repository.current.profiles.firstOrNull { it.id == p["id"].asString }
         return if (local == null) "receive" else Wire.direction(Wire.revision(export(local)), m["revision"].asString, meta["common"].asJsonObject[p["id"].asString]?.asString)
     }
-    fun accept(choice: String): JsonObject {
+    fun accept(choice: String, expectedNonce: String = requireNotNull(meta["pending"]?.asJsonObject)["message"].asJsonObject["nonce"].asString): JsonObject {
         require(choice in listOf("replace", "copy", "keep"))
         val pending = requireNotNull(meta["pending"]?.asJsonObject); val m = pending["message"].asJsonObject
+        require(m["nonce"].asString == expectedNonce) { "收到的档案已更新，请重新预览" }
         val raw = m["profile"].asJsonObject; val p = gson.fromJson(raw, Profile::class.java)
         val local = repository.current.profiles.firstOrNull { it.id == p.id }
         require(local == null || Wire.revision(export(local)) == pending["localRevision"]?.asString) { "预览后手机版已修改，请重新接收预览" }

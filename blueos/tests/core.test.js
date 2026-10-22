@@ -35,3 +35,17 @@ test('dropped ACK, duplicate DATA/END, durable restart and resume', async () => 
 test('failed journal write does not advance ACK cursor', async () => { const s = new Sender(1, { a: 1 }); const r = new Receiver(null, async () => { throw Error('disk full') }, async () => {}); await assert.rejects(r.receive(s.packet())); assert.equal(r.state, null) })
 test('failed delivery keeps existing profile and allows retry', async () => { let fail = true; const s = new Sender(2, { a: 1 }); const r = new Receiver(null, async () => {}, async () => { if (fail) throw Error('disk full') }); s.ack(await r.receive(s.packet())); while (decode(s.packet()).op === OP.DATA) s.ack(await r.receive(s.packet())); await assert.rejects(r.receive(s.packet())); assert.equal(r.state.complete, false); fail = false; s.ack(await r.receive(s.packet())); assert.equal(s.packet(), null) })
 test('wrong transfer and payload corruption fail without delivery', async () => { const s = new Sender(3, { a: 1 }), r = new Receiver(null, async () => {}, async () => assert.fail()); s.ack(await r.receive(s.packet())); await assert.rejects(r.receive(frame(OP.DATA, 4, 1, [1]))); s.ack(await r.receive(frame(OP.DATA, 3, 1, Array.from(s.bytes).map((b, i) => i ? b : b ^ 1)))); await assert.rejects(r.receive(s.packet())) })
+test('global fallback, group priority and same-priority conflict are explicit', () => {
+ const p=sample();const global=clone(p.plans[0]);global.id='global-plan';global.groupId='global';global.subjects['slot-a']='s-b';p.plans.unshift(global)
+ assert.equal(state(p,time('08:10:00')).current.subject.id,'s-a');p.plans.push({...clone(p.plans[1]),id:'competing'});assert.equal(resolve(p,'2026-10-19',time('08:10:00')).conflicts,true)
+ p.activeGroup='other';p.groups.push({id:'other',name:'合成空课表群',global:false});assert.equal(state(p,time('08:10:00')).current.subject.id,'s-b')
+})
+test('temporary group inheritance and overlapping lesson layer', () => {
+ const p=sample();p.groups.push({id:'temporary-group',name:'合成临时群',global:false});p.temporary.push({id:'group-temp',name:'合成继承',type:'GROUP',targetId:'temporary-group',startMillis:time('00:00:00'),endMillis:time('23:59:59'),inheritGroup:true,patches:[]})
+ assert.equal(state(p,time('08:10:00')).current.subject.id,'s-a')
+ const l=clone(p.layouts[0]);l.id='layer-layout';l.slots=[{...clone(l.slots[0]),id:'layer-slot',start:29400,end:30600}];p.layouts.push(l)
+ const q={...clone(p.plans[0]),id:'layer-plan',layoutId:l.id,layerOnly:true,subjects:{'layer-slot':'s-b'}};p.plans.push(q);p.temporary.push({id:'layer-temp',name:'合成层',type:'LAYER',targetId:q.id,startMillis:time('00:00:00'),endMillis:time('23:59:59'),inheritGroup:false,patches:[]})
+ assert.equal(state(p,time('08:15:00')).current.subject.id,'s-b');assert.equal(state(p,time('09:00:00')).current.subject.id,'s-b')
+})
+test('snapshot expires at the next temporary rule boundary', () => {const p=lessonChange(sample(),'2026-10-19','plan','slot-a','s-b');p.temporary[0].endMillis=time('08:20:00');assert.equal(snapshot(p,time('08:10:00'),'v').validUntil,time('08:20:00'))})
+test('confirmation is bound to the exact previewed offer',()=>{const p=sample(),a=preview(offer(p,'old-preview'),p,null),b=preview(offer(p,'new-preview'),p,null);assert.throws(()=>accept([p],b,'replace',a.message.nonce),/重新预览/)})
