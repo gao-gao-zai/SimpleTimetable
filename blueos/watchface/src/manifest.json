@@ -1,0 +1,38 @@
+{
+  "package": "io.github.gaogaoza.simpletimetable.watchface",
+  "versionName": "0.1.0",
+  "versionCode": 1,
+  "config": {
+    "designWidth": 466
+  },
+  "deviceTypeList": [
+    "watch"
+  ],
+  "router": {
+    "watchfaces": {
+      "watch3000": {
+        "id": 3000,
+        "name": "课表参考表盘",
+        "component": "index",
+        "edit": "",
+        "features": [
+          {
+            "name": "blueos.storage.storage"
+          },
+          {
+            "name": "blueos.storage.exchange"
+          },
+          {
+            "name": "blueos.app.event.eventManager"
+          }
+        ],
+        "params": {
+          "previewImage": [
+            "local://io.github.gaogaoza.simpletimetable.watchface/watch3000/assets/preview.png"
+          ],
+          "hpw": 0
+        }
+      }
+    }
+  }
+}

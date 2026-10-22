@@ -1,0 +1,29 @@
+<template>
+  <div class="face">
+    <text class="clock">{{time}}</text>
+    <text class="date">{{date}}</text>
+    <text class="course">{{title}}</text>
+    <text class="next">下一节 · {{next}}</text>
+    <text class="status">{{status}}</text>
+  </div>
+</template>
+<script>
+import { SnapshotReader } from './lib/snapshot-reader.js'
+let reader=null,timer=null
+export default {
+  data:{time:'00:00',date:'',title:'请打开简单课表',next:'',status:'等待共享数据'},
+  onReady(){reader=new SnapshotReader(v=>{this.title=v.title;this.next=v.next;this.status=v.expired?'缓存过期，请打开 App':'版本 '+v.version});reader.start();this.clock()},
+  onShow(){this.clock();if(!timer)timer=setInterval(()=>this.clock(),1000);if(reader)reader.refresh()},
+  onHide(){if(timer)clearInterval(timer);timer=null},
+  onDestroy(){if(timer)clearInterval(timer);if(reader)reader.stop();timer=null;reader=null},
+  clock(){const d=new Date();this.time=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');this.date=(d.getMonth()+1)+' 月 '+d.getDate()+' 日'}
+}
+</script>
+<style>
+.face{width:100%;height:100%;background-color:#080D0B;flex-direction:column;align-items:center;justify-content:center;padding:30px;}
+.clock{color:#54C589;font-size:76px;}
+.date{color:#B3C6BA;font-size:24px;}
+.course{color:#F1F7F3;font-size:34px;margin-top:18px;text-align:center;}
+.next{color:#E1EDE4;font-size:24px;margin-top:12px;}
+.status{color:#B3C6BA;font-size:18px;margin-top:12px;}
+</style>

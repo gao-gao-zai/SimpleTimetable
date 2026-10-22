@@ -1,0 +1,80 @@
+<template>
+  <div class="root" style="background-color:{{bg}};">
+    <list class="list" scrollbar="true">
+      <list-item type="title"><text class="title" style="color:{{fg}};font-size:{{font}}px;">{{title}}</text></list-item>
+      <list-item type="message" if="{{message}}"><text class="note" style="color:{{fg}};">{{message}}</text></list-item>
+      <list-item type="hero" if="{{home}}">
+        <div class="hero">
+          <text class="date" style="color:{{fg}};">{{today}}</text>
+          <text class="course" style="color:{{fg}};">{{course}}</text>
+          <text class="count">{{countdown}}</text>
+          <progress class="progress" type="horizontal" percent="{{progress}}" color="#54C589"></progress>
+          <text class="note" style="color:{{fg}};">{{progressLabel}}</text>
+          <text class="note" style="color:{{fg}};">{{next}}</text>
+        </div>
+      </list-item>
+      <list-item type="clock" if="{{timePicker}}">
+        <div class="clockrow">
+          <div class="clockcol"><text class="step" onclick="delta(0,1)">＋</text><text class="count">{{hours}}</text><text class="step" onclick="delta(0,-1)">−</text></div>
+          <div class="clockcol"><text class="step" onclick="delta(1,1)">＋</text><text class="count">{{minutes}}</text><text class="step" onclick="delta(1,-1)">−</text></div>
+          <div class="clockcol"><text class="step" onclick="delta(2,1)">＋</text><text class="count">{{seconds}}</text><text class="step" onclick="delta(2,-1)">−</text></div>
+        </div>
+      </list-item>
+      <list-item type="row" for="{{rows}}">
+        <div class="row" style="background-color:{{surface}};" onclick="choose($item.key)">
+          <text class="label" style="color:{{fg}};font-size:{{font}}px;">{{$item.label}}</text>
+          <text class="note" style="color:{{fg}};" if="{{$item.sub}}">{{$item.sub}}</text>
+        </div>
+      </list-item>
+      <list-item type="footer"><text class="footer">简单课表</text></list-item>
+    </list>
+  </div>
+</template>
+<script>
+import { WatchUI } from '../../core/ui.js'
+import { clock, dateText } from '../../core/engine.js'
+import * as store from '../../platform/store.js'
+import * as ble from '../../platform/ble.js'
+import { publish } from '../../platform/sharing.js'
+let ui = null, tick = null, shareTick = null
+export default {
+  data: { bg:'#080D0B', fg:'#F1F7F3', surface:'#17251D', font:28, title:'正在读取', rows:[], home:false, today:'', course:'', countdown:'', progress:0, progressLabel:'', next:'', message:'', timePicker:false, hours:'00', minutes:'00', seconds:'00' },
+  async onReady() {
+    try {
+      await store.open()
+      const share = () => publish(store.active()).catch(e => { if (ui) { ui.message = e.message; ui.refresh() } })
+      ui = new WatchUI({ db:()=>store.db, save:store.save, publish:share, start:ble.start, stop:ble.stop, send:ble.sendProfile, pull:ble.pull, decide:ble.decide }, model => {
+        const s = store.db.settings, light = s.theme === 'light'
+        this.bg = light ? '#F3F8F4' : '#080D0B'; this.fg = light ? '#0A2114' : '#F1F7F3'; this.surface = light ? '#DDEBE1' : '#17251D'; this.font = s.largeText ? 34 : 28
+        this.title=model.title; this.rows=model.rows; this.message=model.message; this.home=!!model.hero; this.timePicker=model.view==='time'
+        if (model.hero) { const h=model.hero; this.today=dateText(new Date()); this.course=h.title; this.countdown=clock(Math.max(0,h.remaining)); this.progress=Math.round(h.progress*100); this.progressLabel='已过去 '+this.progress+'%'; this.next='下一节 · '+(h.next && h.next.subject ? h.next.subject.name : '暂无') }
+        if (this.timePicker) { this.hours=model.timeParts[0]; this.minutes=model.timeParts[1]; this.seconds=model.timeParts[2] }
+      })
+      ui.refresh(); share(); shareTick=setInterval(share,60000)
+    } catch(e) { this.message='无法读取，原数据已保留：'+e.message }
+  },
+  onShow() { if (!tick) tick=setInterval(()=>{if(ui && ui.view==='home') ui.refresh()},1000) },
+  onHide() { if(tick) clearInterval(tick); tick=null; ble.stop(); if(ui) ui.code='' },
+  onDestroy() { if(tick) clearInterval(tick); if(shareTick) clearInterval(shareTick); tick=null; shareTick=null; ble.stop(); ui=null },
+  onBackPress() { if(ui) ui.back(); return true },
+  choose(key) { if(ui) ui.click(key) },
+  delta(part,n) { if(ui) ui.timeDelta(part,n) }
+}
+</script>
+<style>
+.root { width:100%; height:100%; flex-direction:column; }
+.list { width:100%; height:100%; }
+.title { width:100%; padding:24px 42px 14px; text-align:center; font-weight:bold; }
+.hero { width:100%; padding:8px 36px; flex-direction:column; align-items:center; }
+.date { font-size:24px; text-align:center; }
+.course { width:100%; font-size:38px; text-align:center; padding:12px 0; }
+.count { font-size:42px; color:#54C589; text-align:center; }
+.progress { width:100%; height:10px; margin:12px 0; }
+.note { width:100%; font-size:22px; padding:8px; text-align:center; }
+.row { width:100%; margin:6px 30px; padding:18px 12px; border-radius:22px; flex-direction:column; align-items:center; }
+.label { width:100%; text-align:center; }
+.footer { color:#54C589; width:100%; text-align:center; font-size:18px; padding:14px 0 32px; }
+.clockrow { width:100%; flex-direction:row; justify-content:center; padding:12px 24px; }
+.clockcol { flex:1; flex-direction:column; align-items:center; }
+.step { font-size:38px; color:#54C589; padding:12px; }
+</style>

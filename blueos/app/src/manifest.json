@@ -1,0 +1,83 @@
+{
+  "package": "io.github.gaogaoza.simpletimetable.blueos",
+  "name": "简单课表",
+  "icon": "/assets/icon.png",
+  "versionName": "0.1.0",
+  "versionCode": 1,
+  "config": {
+    "designWidth": 466
+  },
+  "deviceTypeList": [
+    "watch"
+  ],
+  "appCategory": [
+    "education"
+  ],
+  "features": [
+    {
+      "name": "blueos.bluetooth.ble"
+    },
+    {
+      "name": "blueos.storage.storage"
+    },
+    {
+      "name": "blueos.storage.exchange"
+    },
+    {
+      "name": "blueos.app.event.eventManager"
+    }
+  ],
+  "permissions": [
+    {
+      "name": "blueos.permission.BLUETOOTH"
+    }
+  ],
+  "router": {
+    "entry": "pages/Main",
+    "pages": {
+      "pages/Main": {
+        "component": "index",
+        "followHand": "disable"
+      }
+    },
+    "widgets": {
+      "widgets/Now": {
+        "type": "js",
+        "name": "当前课程",
+        "description": "只读课程摘要，过期提示",
+        "component": "index",
+        "minCardPlatformVersion": 2000,
+        "versionCode": 1,
+        "versionName": "0.1.0",
+        "sizes": [
+          "2x2"
+        ],
+        "deviceTypeList": [
+          "watch"
+        ],
+        "features": [
+          {
+            "name": "blueos.storage.storage"
+          },
+          {
+            "name": "blueos.storage.exchange"
+          },
+          {
+            "name": "blueos.app.event.eventManager"
+          }
+        ],
+        "previewImages": [
+          {
+            "size": "2x2",
+            "images": [
+              "assets/preview.png"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "display": {
+    "backgroundColor": "#080D0B"
+  }
+}
