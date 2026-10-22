@@ -1,6 +1,6 @@
 # 简单课表 / SimpleTimetable
 
-离线、免账号的原生 Android 课表应用。Kotlin + Jetpack Compose，面向普通手机竖屏与非 Wear OS Android 手表，最低 Android 8.0（API 26）。当前版本为 0.1.2，设计以已确认的 v22 原型为准。
+离线、免账号的原生 Android 课表应用。Kotlin + Jetpack Compose，面向普通手机竖屏与非 Wear OS Android 手表，最低 Android 8.0（API 26）。安卓基线为 0.1.2，本恢复分支版本为 0.1.2-blueos.1，设计以已确认的 v22 原型为准。
 
 - 科目、共享时间表、课表群、按星期与多周轮换的课表管理。
 - 实际启用和浏览编辑分离；单节替换、跨日交换、临时整张课表与临时层，保存后生效并按有效期失效。
@@ -9,7 +9,7 @@
 - 可关闭的静默通知，以及课程卡片、可滚动今日课表两种原生桌面小组件。
 - ClassIsland JSON、Excel XLSX 与 CSV 导入；可选 NTP 软件校时，设备校准与学校偏移分离。
 
-不含作业、响铃、振动、提醒、自动化、账号或云同步。vivo WATCH / BlueOS 及其 SDK、传输和快捷卡片已延期，本项目当前没有这些平台的实现。
+不含作业、响铃、振动、提醒、自动化、账号或云同步。本恢复分支新增原生 BlueOS App、标准卡、参考表盘源码和安卓独立 BLE 配套同步。BlueOS 官方编译及 GT2 真机互通尚未验证，详见 [恢复状态](docs/blueos-recovery.md)、[BlueOS 工程](blueos/README.md) 与 [新同步协议](protocol/README.md)。旧会话文件未取得，本分支是按需求重新实现。
 
 ## 构建与测试
 

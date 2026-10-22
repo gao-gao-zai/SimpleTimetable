@@ -4,7 +4,7 @@
 
 本次源码重建，不是恢复旧文件。平台无关测试：`cd blueos && npm test`。重新同步卡片/表盘自包含源码：`python3 blueos/scripts/sync-shared.py`。每个卡片的代码和资源均位于自己的目录。
 
-将 `blueos/app`、`blueos/watchface` 分别作为项目用官方 BlueOS Studio 打开，选择官方 Toolkit 编译/打包。当前环境没有可调用的 Sediment 下载工具，无法取得历史五分卷的 1.0.12-beta.13；尚未完成官方编译，源码和 manifest 仍可能需要按取得的 SDK 调整，不能把 JS 测试当作 RPK 构建。不可用 zip 改扩展名代替 RPK。
+将 `blueos/app`、`blueos/watchface` 分别作为项目用官方 BlueOS Studio 打开，选择官方 Toolkit 编译/打包。工具包现已由父会话保存到 Library，但消费环境下载被网络代理 403 拒绝，未取得文件；尚未完成官方编译，源码和 manifest 仍可能需要按取得的 SDK 调整，不能把 JS 测试当作 RPK 构建。不可用 zip 改扩展名代替 RPK。
 
 标准卡 `minCardPlatformVersion:2000` 及独立 BLE 在 GT2 固件上的可用性必须真机检查。标准卡是新文档中的 js 卡，不冒充轻卡 widgetProvider；轻卡不在此版本实现。参考表盘的 `watch3000/id:3000` 是官方示例用的本地开发标识；正式服务端分配 ID 尚未取得，不擅自注册。不要将该示例 ID 当作可商店发布的正式 ID。
 

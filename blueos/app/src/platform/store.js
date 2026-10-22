@@ -38,14 +38,21 @@ export async function open() {
   if (value.schema !== 1 || !value.profiles || !value.profiles.length) throw Error('存储版本无效')
   value.profiles.forEach(validate); db = value; transfers = await journal.load({}); return db
 }
-export async function save(change) {
-  const next = JSON.parse(JSON.stringify(db)); change(next); next.profiles.forEach(validate)
-  await live.save(next); db = next; return db
+let changes = Promise.resolve(), transferChanges = Promise.resolve()
+export function save(change) {
+  const result = changes.then(async () => {
+    const next = JSON.parse(JSON.stringify(db)); change(next); next.profiles.forEach(validate)
+    await live.save(next); db = next; return db
+  })
+  changes = result.catch(() => {}); return result
 }
-export async function saveTransfer(id, state) {
-  const next = { ...transfers, [id]: state }
-  const keys = Object.keys(next)
-  if (keys.length > 6) delete next[keys.find(k => k !== String(id) && next[k].complete) || keys.find(k => k !== String(id))]
-  await journal.save(next); transfers = next
+export function saveTransfer(id, state) {
+  const result = transferChanges.then(async () => {
+    const next = { ...transfers, [id]: state }
+    const keys = Object.keys(next)
+    if (keys.length > 6) delete next[keys.find(k => k !== String(id) && next[k].complete) || keys.find(k => k !== String(id))]
+    await journal.save(next); transfers = next
+  })
+  transferChanges = result.catch(() => {}); return result
 }
 export function active() { return db.profiles.find(p => p.id === db.activeProfile) || db.profiles[0] }

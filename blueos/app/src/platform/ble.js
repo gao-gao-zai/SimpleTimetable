@@ -1,15 +1,15 @@
 import bluetooth from '@blueos.bluetooth.ble'
 import { Link } from '../core/link.js'
 import { SERVICE, RX, TX } from '../core/transport.js'
-import { revision } from '../core/codec.js'
+import { revision, crc32, utf8 } from '../core/codec.js'
 import { offer, preview, accept } from '../core/sync.js'
 import { db, transfers, saveTransfer, save } from './store.js'
 import { id } from '../core/model.js'
-let server = null, peer = '', subscribed = false, paired = false, code = '', expires = 0, failures = 0, serial = 0, timer = null, link = null
+let server = null, peer = '', subscribed = false, paired = false, code = '', expires = 0, failures = 0, timer = null, link = null
 let inform = () => {}
 const CCCD = '00002902-0000-1000-8000-00805f9b34fb'
 function nonce() { return id() }
-function send(message) { link.enqueue((++serial % 65535) || ++serial, { protocol: 1, nonce: nonce(), ...message }) }
+function send(message) { const m = { protocol: 1, nonce: nonce(), ...message }; link.enqueue(crc32(utf8(m.nonce)) % 65535 + 1, m) }
 function catalog() { send({ type: 'CATALOG', profiles: db.profiles.map(p => ({ id: p.id, name: p.name, revision: revision(p) })) }) }
 async function deliver(m) {
   if (m.protocol !== 1 || typeof m.nonce !== 'string' || m.nonce.length > 100) throw Error('不支持的消息')
@@ -61,7 +61,7 @@ export function start(callback) {
   link = new Link({ sendRaw: raw, load: async n => transfers[n], save: saveTransfer, deliver, error: e => inform(e.message) })
   const response = (r, status = 0, value = new ArrayBuffer(0)) => server.sendResponse({ deviceId: r.deviceId, transId: r.transId, status, offset: r.offset, value })
   server.subscribeConnectStateChange({ callback: s => {
-    if (s.state === 0) { peer = ''; subscribed = false; paired = false; link.disconnect(); inform('已断开；已接收分包保留，重新连接可恢复') }
+    if (s.state === 0) { peer = ''; subscribed = false; paired = false; link.disconnect(); link.current = null; link.queue = []; link.receivers = {}; inform('已断开；已接收分包保留，重新连接可恢复') }
     if (s.state === 2) { if (peer && peer !== s.deviceId) { inform('已有手机连接'); return }; peer = s.deviceId; paired = false }
   }, fail: () => inform('蓝牙连接监听失败') })
   server.subscribeCharacteristicWrite({ callback: r => {
