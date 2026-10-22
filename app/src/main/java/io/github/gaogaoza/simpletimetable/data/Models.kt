@@ -7,7 +7,7 @@ import java.util.UUID
 
 fun newId(): String = UUID.randomUUID().toString()
 enum class SlotType { LESSON, BREAK, DIVIDER }
-data class Subject(val id: String = newId(), val name: String = "", val shortName: String = "", val teacher: String = "", val color: String = "#657E9C", val outdoor: Boolean = false)
+data class Subject(val id: String = newId(), val name: String = "", val shortName: String = "", val teacher: String = "", val color: String = "#657E9C", val outdoor: Boolean = false, val favorite: Boolean = false)
 data class TimeSlot(val id: String = newId(), val name: String = "", val start: Int = 8 * 3600, val end: Int = 8 * 3600 + 2700, val type: SlotType = SlotType.LESSON, val defaultSubject: String = "")
 data class TimeLayout(val id: String = newId(), val name: String = "", val defaultMinutes: Int = 45, val defaultSubject: String = "", val slots: List<TimeSlot> = emptyList(), val defaultBreakMinutes: Int = 10)
 data class ClassPlan(

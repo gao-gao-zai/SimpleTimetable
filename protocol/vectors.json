@@ -1,0 +1,47 @@
+{
+  "crc": {
+    "text": "123456789",
+    "crc16": 10673,
+    "crc32": 3421780262
+  },
+  "frames": [
+    {
+      "op": 2,
+      "id": 42,
+      "seq": 2,
+      "data": [
+        0,
+        1,
+        127,
+        128,
+        255
+      ],
+      "hex": "5301022a0002000585ee00017f80ff"
+    },
+    {
+      "op": 4,
+      "id": 65535,
+      "seq": 1,
+      "data": [],
+      "hex": "530104ffff010000d3aa"
+    }
+  ],
+  "revisions": [
+    {
+      "message": {
+        "type": "HELLO",
+        "protocol": 1,
+        "nonce": "synthetic-hello",
+        "code": "123456"
+      },
+      "revision": "5f7181fc"
+    },
+    {
+      "message": {
+        "b": 2,
+        "a": "合成😀 <>& \" \\  "
+      },
+      "revision": "383367db"
+    }
+  ]
+}

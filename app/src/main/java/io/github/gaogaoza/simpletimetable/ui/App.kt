@@ -71,7 +71,7 @@ class UiSession(activeId: String, date: LocalDate) {
     var notificationExpanded by mutableStateOf(true)
     var message by mutableStateOf("")
 }
-val pageTitles = mapOf("home" to "现在", "schedule" to "课表", "manage" to "管理", "subjects" to "科目", "layouts" to "时间表", "plans" to "课表", "groups" to "课表群与启用", "temporary" to "临时安排", "profiles" to "档案", "settings" to "显示与时间", "external" to "通知与小组件", "import" to "导入课表")
+val pageTitles = mapOf("home" to "现在", "schedule" to "课表", "manage" to "管理", "subjects" to "科目", "layouts" to "时间表", "plans" to "课表", "groups" to "课表群与启用", "temporary" to "临时安排", "profiles" to "档案", "settings" to "显示与时间", "external" to "通知与小组件", "import" to "导入课表", "watchSync" to "手表同步")
 fun dateLabel(date: LocalDate) = "${date.monthValue} 月 ${date.dayOfMonth} 日 · 周${"日一二三四五六"[date.dayOfWeek.value % 7]}"
 
 @Composable fun TimetableApp(app: TimetableApplication, launch: Intent) {
@@ -124,6 +124,7 @@ fun dateLabel(date: LocalDate) = "${date.monthValue} 月 ${date.dayOfMonth} 日 
                     "settings" -> SettingsPage(app, db, session)
                     "external" -> SystemPreviewPage(app, db, state, session, compact)
                     "import" -> ImportPage(app, profile, session)
+                    "watchSync" -> WatchSyncPage(app, db)
                 } }
             }
         }
@@ -252,6 +253,7 @@ fun openLesson(session: UiSession, profile: Profile, date: LocalDate, lesson: Le
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
         item { InactiveProfile(profile, db) }
         val entries = listOf(
+            Triple("watchSync", "手表同步", "BlueOS · 双向完整档案 · 预览确认"),
             Triple("profiles", "档案", profile.name + if (profile.id == db.active().id) " · 当前启用" else " · 当前运行 ${db.active().name}"),
             Triple("subjects", "科目", "${profile.subjects.size} 个 · 名称、教师与颜色"), Triple("layouts", "时间表", "${profile.layouts.size} 份 · 时段与共享引用"),
             Triple("plans", "课表", "${profile.plans.size} 份 · 日期与多周规则"), Triple("groups", "课表群与启用", "自动、手动与临时覆盖"), Triple("temporary", "临时安排", "${profile.temporary.size} 项 · 有效期与调课"),

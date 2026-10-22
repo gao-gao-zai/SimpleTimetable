@@ -20,8 +20,8 @@ android {
         applicationId = "io.github.gaogaoza.simpletimetable"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.1.2"
+        versionCode = 4
+        versionName = "0.1.2-blueos.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; buildConfig = true }
@@ -61,6 +61,7 @@ android {
             listOf("https.proxyHost", "https.proxyPort", "http.proxyHost", "http.proxyPort").forEach { key -> System.getProperty(key)?.let { value -> it.systemProperty(key, value) } }
         }
     }
+    sourceSets["test"].resources.srcDir(rootProject.file("protocol"))
     packaging { resources.excludes += setOf("META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*") }
 }
 dependencies {
