@@ -68,6 +68,7 @@ export class WatchUI {
   timeDelta(part, n) { const unit = [3600, 60, 1][part]; this.timeEdit.value = (this.timeEdit.value + unit * n + 86400) % 86400; this.refresh() }
   editRows() {
     const row = (...args) => this.row(...args), c = this.collection, x = this.item(), p = this.draft
+    if (!x) { this.show('已删除的草稿条目', [row('重试保存', () => this.commit()), row('放弃修改', () => this.leaveDraft())]); return }
     const rows = [row('名称：' + x.name, () => this.chooseName(x, 'name', c === 'subjects' ? ['语文', '数学', '英语', '物理', '化学', '地理', '历史', '体育', '自习'] : ['常规', '上午', '下午', '学校', '假期', '单周', '双周', '备用'], 'edit'))]
     if (c === 'subjects') rows.push(row('教师：' + (x.teacher || '未设置'), () => this.choices('教师预设', ['', '任课教师', '教师一', '教师二', '教师三', '教师四'].map(v => ({ label: v || '未设置', value: v })), v => { x.teacher = v; this.go('edit') }, 'edit')), row('收藏：' + !!x.favorite, () => { x.favorite = !x.favorite }), row('户外：' + !!x.outdoor, () => { x.outdoor = !x.outdoor }))
     if (c === 'layouts') rows.push(row('课程默认分钟 ' + x.defaultMinutes, () => this.number('课程分钟', x, 'defaultMinutes', 1, 720, 'edit')), row('课间默认分钟 ' + x.defaultBreakMinutes, () => this.number('课间分钟', x, 'defaultBreakMinutes', 1, 720, 'edit')), row('默认科目', () => this.subjectPicker(v => { x.defaultSubject = v; this.go('edit') }, 'edit')), row('编辑时段', () => this.go('slots')), row('整体提前 1 分钟', () => x.slots.forEach(s => { s.start -= 60; s.end -= 60 })), row('整体推后 1 分钟', () => x.slots.forEach(s => { s.start += 60; s.end += 60 })))

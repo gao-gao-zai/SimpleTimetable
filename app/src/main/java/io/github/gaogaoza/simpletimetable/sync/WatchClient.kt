@@ -143,7 +143,7 @@ class WatchClient(private val context: Context, private val repository: Reposito
     init { handler.post(timer) }
     private fun catalog() = enqueue(SyncStore.message("CATALOG").apply { add("profiles", JsonArray().apply { repository.current.profiles.forEach { p -> add(JsonObject().apply { addProperty("id", p.id); addProperty("name", p.name); addProperty("revision", Wire.revision(store.export(p))) }) } }) })
     private fun deliver(m: JsonObject) {
-        require(m["protocol"]?.asInt == 1 && m["nonce"]?.asString?.length in 1..100)
+        require(m["protocol"]?.asInt == 1 && (m["nonce"]?.asString?.length ?: 0) in 1..100)
         if (m["type"].asString == "READY") {
             change { it.copy(paired = true, status = "已连接，请选择方向与档案") }; code = ""; ++timeoutGeneration; catalog()
             store.meta["outbox"]?.asJsonObject?.let(::enqueue); return
