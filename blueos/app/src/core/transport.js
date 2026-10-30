@@ -51,7 +51,7 @@ export class Receiver {
         if (f.data.length || bytes.length !== s.size || crc32(bytes) !== s.sum) throw Error('Transfer checksum/length')
         if(this.options.active && !this.options.active())throw Error('Transfer cancelled')
         let decodedBytes=bytes.length
-        const message = this.options.handshake ? JSON.parse(text(bytes)) : await finalize(bytes,s.codec || 0,{...this.options,decoded:size=>{decodedBytes=size}})
+        const message = this.options.handshake ? JSON.parse(text(bytes)) : await finalize(bytes,s.codec || 0,{...this.options,owned:!!this.options.memory,decoded:size=>{decodedBytes=size}})
         // Delivery must be idempotent by message nonce; lost ACK may repeat it after restart.
         if(this.options.active && !this.options.active())throw Error('Transfer cancelled')
         if(this.options.stage)this.options.stage('暂存')

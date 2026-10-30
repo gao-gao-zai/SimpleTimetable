@@ -2,13 +2,19 @@ import { clone, dateText, dateAt, moveDate, resolve, state, clock, EngineCache }
 import { emptyProfile, id, validate, sample, lessonChange, swap } from './model.js'
 import { effectiveNow, offsetSeconds, offsetLabel } from './clock.js'
 export class WatchUI {
-  constructor(api, render) { this.api = api; this.render = render; this.cache = new EngineCache(); this.view = 'home'; this.profileId = ''; this.date = dateText(new Date(this.now())); this.draft = null; this.actions = {}; this.message = ''; this.code = ''; this.phoneProfiles = []; this.busy = false; this.swapFrom = null }
+  constructor(api, render) { this.api = api; this.render = render; this.cache = new EngineCache(); this.view = 'home'; this.profileId = ''; this.date = dateText(new Date(this.now())); this.draft = null; this.actions = {}; this.nextAction = 0; this.message = ''; this.code = ''; this.phoneProfiles = []; this.busy = false; this.swapFrom = null }
   now() { return effectiveNow(this.api.db().settings, this.api.now ? this.api.now() : Date.now()) }
   db() { return this.api.db() }
   profile() { return this.db().profiles.find(p => p.id === this.profileId) || this.db().profiles.find(p => p.id === this.db().activeProfile) || this.db().profiles[0] }
-  row(label, action, sub = '') { const key = String(Object.keys(this.actions).length); this.actions[key] = action; return { key, label, sub, kind: 'action', color: '#54C589', time: '', badge: '' } }
+  row(label, action, sub = '') { const key = String(this.nextAction++); this.actions[key] = action; return { key, label, sub, kind: 'action', color: '#54C589', time: '', badge: '' } }
   async click(key) { if (this.busy) return; try { this.busy = true; const fn = this.actions[key]; if (fn) await fn() } catch (e) { this.message = e.message } finally { this.busy = false; this.refresh() } }
-  show(title, rows) { this.title = title; this.rows = rows; this.render(this) }
+  show(title, rows) {
+    this.title = title
+    const previous = this.rows, fields = ['key','label','sub','kind','color','time','badge']
+    // New callbacks remain in actions, but unchanged visual rows keep native list identity.
+    if (!previous || previous.length !== rows.length || rows.some((row,i) => fields.some(key => row[key] !== previous[i][key]))) this.rows = rows
+    this.render(this)
+  }
   navigate(view) {
     if (this.draft) { this.confirm('放弃未保存修改？', () => { this.draft = null; this.go(view) }, this.view); return }
     if (this.view === 'offset') { this.confirm('放弃未保存偏移？', () => this.go(view), 'offset'); return }
@@ -49,7 +55,7 @@ export class WatchUI {
   subjectPicker(apply, back, allowEmpty = true) { const subs = (this.draft || this.profile()).subjects.slice().sort((a, b) => Number(!!b.favorite) - Number(!!a.favorite)); this.choices('选择科目', (allowEmpty ? [{ label: '无科目 / 停课', value: '' }] : []).concat(subs.map(s => ({ label: (s.favorite ? '★ ' : '') + s.name, value: s.id }))), apply, back) }
   refresh() {
     if (this.busy || !this.db()) return
-    this.actions = {}; const row = (...args) => this.row(...args), p = this.profile(), back = () => this.go('more')
+    this.actions = {}; this.nextAction = 0; const row = (...args) => this.row(...args), p = this.profile(), back = () => this.go('more')
     if (this.view === 'home') { const active = this.db().profiles.find(p => p.id === this.db().activeProfile) || this.db().profiles[0]; this.hero = state(active); this.show('现在', [row('课表', () => { this.date = dateText(new Date(this.now())); this.go('schedule') }), row('更多', back)]); return }
     this.hero = null
     if (this.view === 'more') { this.show('管理', [ ...[['profiles', '档案'], ['subjects', '科目'], ['layouts', '作息'], ['plans', '课表'], ['groups', '课表群与启用'], ['temporary', '临时安排'], ['sync', '手机同步'], ['offset', '时间与偏移'], ['settings', '显示'], ['advanced', '高级与诊断']].map(([v, label]) => row(label, () => { if (v === 'offset') this.offsetDraft = offsetSeconds(this.db().settings); this.go(v) }))]); return }

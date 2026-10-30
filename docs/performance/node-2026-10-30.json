@@ -1,0 +1,87 @@
+{
+  "base": "b894c0d8a8017b52519f50e7276e59b9a0f068d8",
+  "runtime": "v24.19.0",
+  "exec_argv": [],
+  "environment": "Synthetic Node/V8 only; no actual BlueOS IO, paint or hardware measurement",
+  "fixtures": {
+    "text_utf16_units": 16000,
+    "text_utf8_bytes": 28000,
+    "profile_utf8_bytes": 21791,
+    "archive_payload_utf8_bytes": 87231
+  },
+  "results": [
+    {
+      "name": "UTF-8 CRC: 16000 UTF-16 units / 28000 B",
+      "baseline_ms": 0.3308994000000001,
+      "current_ms": 0.05776668000000001,
+      "speedup": 5.728205256040335,
+      "batches": 7,
+      "iterations_per_batch": 50
+    },
+    {
+      "name": "cold archive load: in-memory IO, complete CRC + JSON checks",
+      "baseline_ms": 1.3503723999999997,
+      "current_ms": 0.4867840666666666,
+      "speedup": 2.7740686116677877,
+      "batches": 7,
+      "iterations_per_batch": 15
+    },
+    {
+      "name": "durable save: freeze, encode, checksum and readback",
+      "baseline_ms": 0.8376026666666652,
+      "current_ms": 0.2491703999999989,
+      "speedup": 3.361565686239894,
+      "batches": 7,
+      "iterations_per_batch": 15
+    },
+    {
+      "name": "profile reference validation: 100 subjects / 8 plans / 24 slots",
+      "baseline_ms": 0.03797253333333022,
+      "current_ms": 0.030170833333333272,
+      "speedup": 1.2585841734566043,
+      "batches": 7,
+      "iterations_per_batch": 30
+    },
+    {
+      "name": "menu refresh: 500 subjects, unchanged visual rows",
+      "baseline_ms": 0.7702444666666679,
+      "current_ms": 0.06537786666666913,
+      "speedup": 11.781425518115798,
+      "batches": 7,
+      "iterations_per_batch": 15
+    },
+    {
+      "name": "first shared summary: compute only, pause hook is a resolved promise",
+      "baseline_ms": 0.50315466666666,
+      "current_ms": 0.39880839999999956,
+      "speedup": 1.2616451074417203,
+      "batches": 7,
+      "iterations_per_batch": 15
+    },
+    {
+      "name": "repeat shared summary: immutable profile cache, same synthetic day",
+      "baseline_ms": 0.479528266666667,
+      "current_ms": 0.0032174999999976233,
+      "speedup": 149.0375343176445,
+      "batches": 7,
+      "iterations_per_batch": 30
+    }
+  ],
+  "operation_counts": {
+    "baseline": {
+      "object_key_enumerations_per_menu_refresh": 502,
+      "parse_calls_per_durable_save": 1,
+      "stringify_calls_per_durable_save": 3
+    },
+    "current": {
+      "object_key_enumerations_per_menu_refresh": 0,
+      "parse_calls_per_durable_save": 0,
+      "stringify_calls_per_durable_save": 2
+    }
+  },
+  "first_share_slices": {
+    "yield_count": 2,
+    "max_observed_compute_slice_ms": 0.43062400000007983,
+    "note": "One synthetic run; not a bound on GT2 execution time or native rendering"
+  }
+}

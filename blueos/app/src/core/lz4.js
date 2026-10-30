@@ -19,8 +19,8 @@ export function compress(input) {
   for(let p=anchor;p<b.length;p++)out.push(b[p])
   return new Uint8Array(out)
 }
-export function* decompressSteps(input, limit=65536, budget=4096) {
-  const b=new Uint8Array(input),out=new Uint8Array(limit);let i=0,n=0,worked=0
+export function* decompressSteps(input, limit=65536, budget=4096, owned=false) {
+  const b=owned&&input instanceof Uint8Array?input:new Uint8Array(input),out=new Uint8Array(limit);let i=0,n=0,worked=0
   const length=initial=>{let value=initial;if(initial===15){let x;do{if(i>=b.length)throw Error('Truncated LZ4 length');x=b[i++];value+=x;if(value>limit)throw Error('LZ4 expansion limit')}while(x===255)}return value}
   if(!b.length)throw Error('Empty LZ4 block')
   while(i<b.length) {

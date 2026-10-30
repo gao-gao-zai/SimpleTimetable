@@ -40,6 +40,39 @@ export function crc32(bytes) {
   for (let i = 0; i < bytes.length; i++) c = c >>> 8 ^ CRC32_TABLE[(c ^ bytes[i]) & 255]
   return (c ^ -1) >>> 0
 }
+// CRC over the exact same strict UTF-8 bytes, without a full numeric-array copy.
+// Passing the unfinished CRC permits bounded canonical-JSON hashing for sharing.
+export function crc32Utf8Update(value, initial = -1, metrics) {
+  let crc = initial, bytes = value.length
+  for (let i = 0; i < value.length; i++) {
+    let c = value.charCodeAt(i)
+    if (c >= 0xd800 && c <= 0xdbff) {
+      const low = value.charCodeAt(++i)
+      if (!(low >= 0xdc00 && low <= 0xdfff)) throw Error('Invalid UTF-16')
+      c = 0x10000 + ((c - 0xd800) << 10) + low - 0xdc00
+      bytes += 2
+    } else if (c >= 0xdc00 && c <= 0xdfff) throw Error('Invalid UTF-16')
+    if (c < 128) crc = crc >>> 8 ^ CRC32_TABLE[(crc ^ c) & 255]
+    else if (c < 2048) {
+      bytes++
+      crc = crc >>> 8 ^ CRC32_TABLE[(crc ^ (192 | c >> 6)) & 255]
+      crc = crc >>> 8 ^ CRC32_TABLE[(crc ^ (128 | c & 63)) & 255]
+    } else if (c < 65536) {
+      bytes += 2
+      crc = crc >>> 8 ^ CRC32_TABLE[(crc ^ (224 | c >> 12)) & 255]
+      crc = crc >>> 8 ^ CRC32_TABLE[(crc ^ (128 | c >> 6 & 63)) & 255]
+      crc = crc >>> 8 ^ CRC32_TABLE[(crc ^ (128 | c & 63)) & 255]
+    } else {
+      crc = crc >>> 8 ^ CRC32_TABLE[(crc ^ (240 | c >> 18)) & 255]
+      crc = crc >>> 8 ^ CRC32_TABLE[(crc ^ (128 | c >> 12 & 63)) & 255]
+      crc = crc >>> 8 ^ CRC32_TABLE[(crc ^ (128 | c >> 6 & 63)) & 255]
+      crc = crc >>> 8 ^ CRC32_TABLE[(crc ^ (128 | c & 63)) & 255]
+    }
+  }
+  if (metrics) metrics.bytes = bytes
+  return crc
+}
+export function crc32Utf8(value, metrics) { return (crc32Utf8Update(value, -1, metrics) ^ -1) >>> 0 }
 export function crc16(bytes) {
   let c = 65535
   for (let i = 0; i < bytes.length; i++) { c ^= bytes[i] << 8; for (let j = 0; j < 8; j++) c = (c << 1 ^ (c & 32768 ? 0x1021 : 0)) & 65535 }
@@ -50,4 +83,4 @@ export function canonical(value) {
   if (value && typeof value === 'object') return '{' + Object.keys(value).sort().map(k => JSON.stringify(k) + ':' + canonical(value[k])).join(',') + '}'
   return JSON.stringify(value)
 }
-export function revision(profile) { return crc32(utf8(canonical(profile))).toString(16).padStart(8, '0') }
+export function revision(profile) { return crc32Utf8(canonical(profile)).toString(16).padStart(8, '0') }

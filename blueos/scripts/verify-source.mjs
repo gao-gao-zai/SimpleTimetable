@@ -12,7 +12,7 @@ function walk(path) {
   const script=f.endsWith('.ux')?(source.match(/<script[^>]*>([\s\S]*?)<\/script>/)||[])[1]:source
   if(script===undefined)throw Error('No script: '+f)
   execFileSync(process.execPath,['--input-type=module','--check'],{input:script,stdio:['pipe','pipe','pipe']})
-  for(const m of script.matchAll(/(?:from\s*|import\s*)['"]([^'"]+)['"]/g))if(m[1].startsWith('.')&&!existsSync(resolve(dirname(f),m[1])))throw Error('Missing import '+f+' '+m[1])
+  for(const m of script.matchAll(/(?:from\s*|import\s*|require\s*\(\s*)['"]([^'"]+)['"]/g))if(m[1].startsWith('.')&&!existsSync(resolve(dirname(f),m[1])))throw Error('Missing import '+f+' '+m[1])
   files++
  }
 }

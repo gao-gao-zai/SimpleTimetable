@@ -87,9 +87,9 @@ export function stateFromResolved(r, millis) {
   return { ...r, phase: r.lessons.length ? 'ENDED' : 'EMPTY', title: r.lessons.length ? '今日课程已结束' : '今天没有课程', remaining: 0, progress: r.lessons.length ? 1 : 0 }
 }
 export function clock(s) { return [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map(n => String(n).padStart(2, '0')).join(':') }
-export function snapshot(profile, realNow, version, timeOffsetSeconds = 0) {
+export function snapshot(profile, realNow, version, timeOffsetSeconds = 0, cache) {
   const now = realNow + timeOffsetSeconds * 1000
-  const s = state(profile, now), date = dateText(new Date(now)), timeline = resolve(profile, date, now).lessons.map(e => ({ start: e.slot.start, end: e.slot.end, title: e.subject ? e.subject.name : '停课/未安排', teacher: e.subject ? e.subject.teacher : '', outdoor: !!(e.subject && e.subject.outdoor) }))
+  const s = cache ? cache.state(profile, now) : state(profile, now), date = dateText(new Date(now)), timeline = (cache ? cache.day(profile, date, now) : resolve(profile, date, now)).lessons.map(e => ({ start: e.slot.start, end: e.slot.end, title: e.subject ? e.subject.name : '停课/未安排', teacher: e.subject ? e.subject.teacher : '', outdoor: !!(e.subject && e.subject.outdoor) }))
   const tomorrow = dateAt(moveDate(date, 1)).getTime()
   const changes = profile.temporary.flatMap(t => [t.startMillis, t.endMillis]).filter(t => t > now)
   return { schema: 1, version, updatedAt: realNow, validUntil: Math.min(tomorrow, now + 3600000, ...changes) - timeOffsetSeconds * 1000, timeOffsetSeconds, date, title: s.title, next: s.next && s.next.subject ? s.next.subject.name : '', timeline }

@@ -53,24 +53,37 @@ import { WatchUI } from '../../core/ui.js'
 import { clock, dateText } from '../../core/engine.js'
 import { StartupTrace, commitChanged } from '../../core/performance.js'
 import * as store from '../../platform/store.js'
-import * as ble from '../../platform/ble.js'
-import { explainReverseRole } from '../../platform/phone-client.js'
-import { diagnose } from '../../platform/card-check.js'
-import { publish } from '../../platform/sharing.js'
-let ui = null, tick = null, shareTick = null, shareTask = null, trace = null
+let ui = null, tick = null, shareTick = null, shareTask = null, trace = null, ble = null
+function sync() { if(!ble)ble=require('../../platform/ble.js');return ble }
 function stopTicks() { if(tick)clearInterval(tick);if(shareTick)clearInterval(shareTick);tick=null;shareTick=null }
 function shareLater() {
-  if (shareTask !== null) return
-  shareTask = setTimeout(() => { shareTask = null; publish(store.active(), store.db.settings).catch(e => { if(ui) { ui.message=e.message;ui.refresh() } }) }, 0)
+  if (!ui || !store.db || shareTask !== null) return
+  shareTask = setTimeout(() => {
+    shareTask = null
+    const started=Date.now(),currentTrace=trace
+    Promise.resolve().then(()=>{
+    const moduleAt=Date.now(),sharing=require('../../platform/sharing.js')
+    if(currentTrace)currentTrace.metric('共享 JS 模块加载（首页提交后）',Date.now()-moduleAt,'ms')
+    return sharing.publish(store.active(),store.db.settings,timing=>{
+      if(!trace||trace!==currentTrace)return
+      trace.metric('共享版本缓存',timing.revisionCacheHit?'命中':'未命中')
+      trace.metric('共享版本计算（含让出）',timing.revisionMs,'ms')
+      trace.metric('共享版本最长连续计算段',timing.revisionWork.maxContinuousMs,'ms')
+      trace.metric('共享课程解析',timing.snapshotMs,'ms')
+      trace.metric('共享原生提交',timing.writeSubmitMs,'ms')
+      trace.metric('共享原生完成（含提交与等待）',timing.writeCompleteMs,'ms')
+      trace.metric('共享更新事件',timing.eventMs,'ms')
+    })}).then(()=>{if(trace&&trace===currentTrace){trace.metric('最近表盘共享（首页提交后）',Date.now()-started,'ms 墙钟，包含分段让出');if(ui&&ui.view==='startup')ui.refresh()}}).catch(e=>{if(ui&&trace===currentTrace){ui.message=e.message;ui.refresh()}})
+  }, 0)
 }
 export default {
   data: { bg:'#080D0B', fg:'#F1F7F3', surface:'#17251D', font:28, title:'正在读取', rows:[], home:false, schedule:false, offset:false, offsetPreview:'', today:'', course:'', countdown:'', countLabel:'', progress:0, progressLabel:'', next:'', message:'', timePicker:false, hours:'00', minutes:'00', seconds:'00' },
-  onInit() { trace = new StartupTrace();trace.mark('页面创建') },
+  onInit() { trace = new StartupTrace();trace.metric('计时起点','页面 onInit 回调；不代表点击图标至首帧');trace.mark('页面创建') },
   async onReady() {
     if(!trace) { trace=new StartupTrace();trace.mark('页面创建') }
     try {
       await store.open(trace)
-      ui = new WatchUI({ db:()=>store.db, save:store.save, publish:shareLater, start:ble.start, stop:ble.stop, send:ble.sendProfile, list:ble.requestCatalog, incoming:ble.incomingRequest, respond:ble.respond, cancel:ble.cancel, pull:ble.pull, decide:ble.decide, trace, diagnose, reverseRole:explainReverseRole, syncStatus:ble.status, previewCard:()=>require('@system.router').push({uri:'/pages/Preview'}) }, (model, timerOnly) => {
+      ui = new WatchUI({ db:()=>store.db, save:store.save, publish:shareLater, start:callback=>sync().start(callback), stop:()=>{if(ble)ble.stop()}, send:p=>sync().sendProfile(p), list:()=>sync().requestCatalog(), incoming:()=>ble?ble.incomingRequest():null, respond:choice=>sync().respond(choice), cancel:()=>{if(ble)ble.cancel()}, pull:id=>sync().pull(id), decide:(choice,nonce)=>sync().decide(choice,nonce), trace, diagnose:()=>require('../../platform/card-check.js').diagnose(), reverseRole:()=>require('../../platform/phone-client.js').explainReverseRole(), syncStatus:()=>ble?ble.status():{active:false,subscribed:false,paired:false,counters:{},transport:{},transfer:null}, previewCard:()=>require('@system.router').push({uri:'/pages/Preview'}) }, (model, timerOnly) => {
         const s=store.db.settings, light=s.theme==='light', values={}
         if(!timerOnly) Object.assign(values,{bg:light?'#F3F8F4':'#080D0B',fg:light?'#0A2114':'#F1F7F3',surface:light?'#DDEBE1':'#17251D',font:s.largeText?34:28,title:model.title,rows:model.rows,message:model.message,home:!!model.hero,schedule:model.view==='schedule',offset:model.view==='offset',timePicker:model.view==='time'})
         if(model.hero) {
@@ -81,14 +94,14 @@ export default {
         if(model.view==='time') Object.assign(values,{hours:model.timeParts[0],minutes:model.timeParts[1],seconds:model.timeParts[2]})
         commitChanged(this,values)
       })
-      ui.refresh();trace.mark('首页数据提交');shareLater()
+      trace.measure('首页解析与绑定提交',()=>ui.refresh());trace.mark('首页数据提交');shareLater()
       this.startTicks()
     } catch(e) { this.message='无法读取，原数据已保留：'+e.message }
   },
   startTicks() { if(!tick)tick=setInterval(()=>{if(ui)ui.tick()},1000);if(!shareTick)shareTick=setInterval(shareLater,60000) },
   onShow() { this.startTicks();if(ui)ui.tick() },
-  onHide() { stopTicks();ble.stop();if(ui)ui.code='' },
-  onDestroy() { stopTicks();if(shareTask!==null)clearTimeout(shareTask);shareTask=null;ble.stop();ui=null },
+  onHide() { stopTicks();if(ble)ble.stop();if(ui)ui.code='' },
+  onDestroy() { stopTicks();if(shareTask!==null)clearTimeout(shareTask);shareTask=null;if(ble)ble.stop();ui=null },
   onBackPress() { if(ui)ui.back();return true },
   navigate(view) { if(ui)ui.navigate(view) },
   moveDay(n) { if(ui)ui.moveDay(n) },

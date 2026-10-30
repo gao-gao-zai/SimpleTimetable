@@ -10,18 +10,18 @@ async function moduleFrom(path,replace){let source=readFileSync(path,'utf8');sou
 test('cold store reads and validates once; reopening reuses checked DB without journal IO',async()=>{
  const p=sample(),db={schema:1,profiles:[p],activeProfile:p.id,settings:{},common:{},receipts:[]},json=JSON.stringify(db),disk={'simpletimetable.v1.head':'a','simpletimetable.v1.a':JSON.stringify({json,crc:crc32(utf8(json))})};let gets=0
  globalThis.testStorage={get:({key,success})=>{gets++;success({value:disk[key]||''})},set:({key,value,success})=>{disk[key]=value;success()}}
- const store=await moduleFrom(resolve(root,'app/src/platform/store.js'),s=>s.replace("import storage from '@system.storage'",'const storage=globalThis.testStorage'))
+ const store=await moduleFrom(resolve(root,'app/src/platform/store.js'),s=>s.replace("require('@system.storage')",'globalThis.testStorage'))
  const stages=[];const first=await store.open({mark:s=>stages.push(s)});assert.deepEqual(stages,['存储读取完成','存档校验完成']);const before=gets;assert.equal(await store.open(),first);assert.equal(gets,before);assert.equal(gets,2)
  delete globalThis.testStorage
 })
 test('corrupt cold DB fails and preserves its bytes rather than returning cached fallback',async()=>{
  const disk={'simpletimetable.v1.head':'a','simpletimetable.v1.a':'broken'};globalThis.testStorage={get:({key,success})=>success(disk[key]||''),set:()=>assert.fail()}
- const store=await moduleFrom(resolve(root,'app/src/platform/store.js'),s=>s.replace("import storage from '@system.storage'",'const storage=globalThis.testStorage'))
+ const store=await moduleFrom(resolve(root,'app/src/platform/store.js'),s=>s.replace("require('@system.storage')",'globalThis.testStorage'))
  await assert.rejects(store.open());assert.equal(disk['simpletimetable.v1.a'],'broken');delete globalThis.testStorage
 })
 test('native imports before first course display are limited to storage',()=>{
  for(const name of ['ble.js','sharing.js','card-check.js']){const s=readFileSync(resolve(root,'app/src/platform',name),'utf8');assert.doesNotMatch(s,/^import .*from ['"]@/m,name)}
- const page=readFileSync(resolve(root,'app/src/pages/Main/index.ux'),'utf8');assert.ok(page.indexOf('ui.refresh();trace.mark')<page.indexOf('shareLater()\n      this.startTicks()'));assert.match(page,/setTimeout\(\(\) =>/);assert.doesNotMatch(page,/await new Promise/)
+ const page=readFileSync(resolve(root,'app/src/pages/Main/index.ux'),'utf8');assert.ok(page.indexOf("trace.measure('首页解析与绑定提交'")<page.indexOf('shareLater()\n      this.startTicks()'));assert.doesNotMatch(page,/^import .*platform\/(ble|sharing|card-check|phone-client)/m);assert.match(page,/setTimeout\(\(\) =>/);assert.doesNotMatch(page,/await new Promise/)
 })
 test('independent watch diagnostic fixed 64B data and CRC cannot touch timetable store',async()=>{
  const probe=await import('../diagnostics/src/probe.js');assert.equal(probe.fixed().length,64);assert.notEqual(probe.uuid(1),'d7300001-9e2c-4c53-a1aa-2cc0bf3d7710');assert.equal(probe.crc32(utf8('123456789')),0xcbf43926);const source=readFileSync(resolve(root,'diagnostics/src/probe.js'),'utf8');assert.doesNotMatch(source,/platform\/store|OFFER|profile|code:/)
