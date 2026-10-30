@@ -45,7 +45,14 @@ export function resolve(profile, date, millis = Date.now()) {
   const base = at(profile, date, effective)
   if (!relevant.length) return base
   const epoch = s => { if (s === 86400) return end; const d = dateAt(date); d.setSeconds(s); return d.getTime() }
-  const bounds = Array.from(new Set([start, end].concat(profile.layouts.flatMap(l => l.slots.flatMap(s => [epoch(s.start), epoch(s.end)])), relevant.flatMap(t => [Math.max(start, t.startMillis), Math.min(end, t.endMillis)])))).sort((a, b) => a - b)
+  const ruleBounds = Array.from(new Set([start,end].concat(relevant.flatMap(t=>[Math.max(start,t.startMillis),Math.min(end,t.endMillis)])))).sort((a,b)=>a-b)
+  const points = ruleBounds.slice()
+  // Only active layouts can affect this segment. Unrelated archived layouts add no boundaries.
+  for(let i=0;i<ruleBounds.length-1;i++){
+    const from=ruleBounds[i],until=ruleBounds[i+1],resolved=at(profile,date,from+(until-from)/2)
+    resolved.slots.forEach(slot=>[epoch(slot.start),epoch(slot.end)].forEach(point=>{if(point>from&&point<until)points.push(point)}))
+  }
+  const bounds=Array.from(new Set(points)).sort((a,b)=>a-b)
   const pieces = [], other = []; let conflicts = false
   for (let i = 0; i < bounds.length - 1; i++) {
     const from = bounds[i], until = bounds[i + 1], r = at(profile, date, from + (until - from) / 2)
@@ -63,7 +70,10 @@ export function resolve(profile, date, millis = Date.now()) {
   return { ...base, lessons: pieces, slots: other.concat(pieces.map(e => e.slot)).sort((a, b) => a.start - b.start), conflicts }
 }
 export function state(profile, millis = Date.now()) {
-  const d = new Date(millis), date = dateText(d), r = at(profile, date, millis)
+  return stateFromResolved(at(profile, dateText(new Date(millis)), millis), millis)
+}
+export function stateFromResolved(r, millis) {
+  const d = new Date(millis)
   const second = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds()
   for (let i = 0; i < r.lessons.length; i++) {
     const e = r.lessons[i], s = e.slot
@@ -77,9 +87,33 @@ export function state(profile, millis = Date.now()) {
   return { ...r, phase: r.lessons.length ? 'ENDED' : 'EMPTY', title: r.lessons.length ? '今日课程已结束' : '今天没有课程', remaining: 0, progress: r.lessons.length ? 1 : 0 }
 }
 export function clock(s) { return [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map(n => String(n).padStart(2, '0')).join(':') }
-export function snapshot(profile, now, version) {
+export function snapshot(profile, realNow, version, timeOffsetSeconds = 0) {
+  const now = realNow + timeOffsetSeconds * 1000
   const s = state(profile, now), date = dateText(new Date(now)), timeline = resolve(profile, date, now).lessons.map(e => ({ start: e.slot.start, end: e.slot.end, title: e.subject ? e.subject.name : '停课/未安排', teacher: e.subject ? e.subject.teacher : '', outdoor: !!(e.subject && e.subject.outdoor) }))
   const tomorrow = dateAt(moveDate(date, 1)).getTime()
   const changes = profile.temporary.flatMap(t => [t.startMillis, t.endMillis]).filter(t => t > now)
-  return { schema: 1, version, updatedAt: now, validUntil: Math.min(tomorrow, now + 3600000, ...changes), date, title: s.title, next: s.next && s.next.subject ? s.next.subject.name : '', timeline }
+  return { schema: 1, version, updatedAt: realNow, validUntil: Math.min(tomorrow, now + 3600000, ...changes) - timeOffsetSeconds * 1000, timeOffsetSeconds, date, title: s.title, next: s.next && s.next.subject ? s.next.subject.name : '', timeline }
+}
+
+// Immutable profile references come from the atomic store. No hashing in the second tick.
+export class EngineCache {
+  constructor() { this.profile = null; this.current = null; this.days = {}; this.resolutions = 0 }
+  prepare(profile, millis) {
+    const date = dateText(new Date(millis))
+    if (this.profile !== profile) { this.profile = profile; this.current = null; this.days = {} }
+    if (!this.current || this.current.date !== date || millis < this.current.from || millis >= this.current.until) {
+      const changes = profile.temporary.flatMap(t => [t.startMillis, t.endMillis])
+      const from = Math.max(dateAt(date).getTime(), ...changes.filter(t => t <= millis))
+      const until = Math.min(dateAt(moveDate(date, 1)).getTime(), ...changes.filter(t => t > millis))
+      this.current = { date, from, until, value: at(profile, date, millis) }; this.resolutions++
+      this.days = {}
+    }
+  }
+  state(profile, millis) { this.prepare(profile, millis); return stateFromResolved(this.current.value, millis) }
+  day(profile, date, millis) {
+    this.prepare(profile, millis)
+    if (!this.days[date]) { this.days[date] = resolve(profile, date, millis); this.resolutions++ }
+    if (Object.keys(this.days).length > 3) { const value = this.days[date]; this.days = { [date]: value } }
+    return this.days[date]
+  }
 }

@@ -3,17 +3,19 @@
     <text class="caption">简单课表</text>
     <text class="course">{{title}}</text>
     <text class="next">下一节 · {{next}}</text>
-    <text class="status">{{status}}</text>
+    <text class="status" onclick="refresh">{{status}} · 点击刷新</text>
   </div>
 </template>
 <script>
 import { SnapshotReader } from './lib/snapshot-reader.js'
-let reader=null
+const readers = new WeakMap()
 export default {
   data:{title:'请打开简单课表',next:'',status:'等待 App 发布'},
-  onReady(){reader=new SnapshotReader(v=>{this.title=v.title;this.next=v.next;this.status=v.expired?'已过期，打开 App 更新':'版本 '+v.version});reader.start()},
-  onShow(){if(reader)reader.refresh()},
-  onDestroy(){if(reader)reader.stop();reader=null}
+  onReady(){const reader=new SnapshotReader(v=>{this.title=v.title;this.next=v.next;this.status=v.expired?'已过期，打开 App 更新':'版本 '+v.version});readers.set(this,reader);reader.start()},
+  onShow(){const reader=readers.get(this);if(reader){reader.start();reader.refresh()}},
+  onHide(){const reader=readers.get(this);if(reader)reader.stop()},
+  refresh(){const reader=readers.get(this);if(reader)reader.refresh()},
+  onDestroy(){const reader=readers.get(this);if(reader)reader.stop();readers.delete(this)}
 }
 </script>
 <style>

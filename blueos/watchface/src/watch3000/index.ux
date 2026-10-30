@@ -13,8 +13,8 @@ let reader=null,timer=null
 export default {
   data:{time:'00:00',date:'',title:'请打开简单课表',next:'',status:'等待共享数据'},
   onReady(){reader=new SnapshotReader(v=>{this.title=v.title;this.next=v.next;this.status=v.expired?'缓存过期，请打开 App':'版本 '+v.version});reader.start();this.clock()},
-  onShow(){this.clock();if(!timer)timer=setInterval(()=>this.clock(),1000);if(reader)reader.refresh()},
-  onHide(){if(timer)clearInterval(timer);timer=null},
+  onShow(){this.clock();if(!timer)timer=setInterval(()=>this.clock(),1000);if(reader){reader.start();reader.refresh()}},
+  onHide(){if(timer)clearInterval(timer);timer=null;if(reader)reader.stop()},
   onDestroy(){if(timer)clearInterval(timer);if(reader)reader.stop();timer=null;reader=null},
   clock(){const d=new Date();this.time=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');this.date=(d.getMonth()+1)+' 月 '+d.getDate()+' 日'}
 }

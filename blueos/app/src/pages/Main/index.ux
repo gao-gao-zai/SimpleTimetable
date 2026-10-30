@@ -1,18 +1,28 @@
 <template>
   <div class="root" style="background-color:{{bg}};">
+    <div class="nav">
+      <text class="navitem" style="color:{{fg}};" onclick="navigate('home')">现在</text>
+      <text class="navitem" style="color:{{fg}};" onclick="navigate('schedule')">课表</text>
+      <text class="navitem" style="color:{{fg}};" onclick="navigate('more')">管理</text>
+    </div>
+    <div class="datebar" if="{{schedule}}">
+      <text class="daystep" onclick="moveDay(-1)">‹</text><text class="daytitle" style="color:{{fg}};">{{title}}</text><text class="daystep" onclick="moveDay(1)">›</text>
+    </div>
     <list class="list" scrollbar="true">
-      <list-item type="title"><text class="title" style="color:{{fg}};font-size:{{font}}px;">{{title}}</text></list-item>
+      <list-item type="title" if="{{!schedule}}"><text class="title" style="color:{{fg}};font-size:{{font}}px;">{{title}}</text></list-item>
       <list-item type="message" if="{{message}}"><text class="note" style="color:{{fg}};">{{message}}</text></list-item>
       <list-item type="hero" if="{{home}}">
         <div class="hero">
           <text class="date" style="color:{{fg}};">{{today}}</text>
           <text class="course" style="color:{{fg}};">{{course}}</text>
+          <text class="note" style="color:{{fg}};">{{countLabel}}</text>
           <text class="count">{{countdown}}</text>
           <progress class="progress" type="horizontal" percent="{{progress}}" color="#54C589"></progress>
           <text class="note" style="color:{{fg}};">{{progressLabel}}</text>
           <text class="note" style="color:{{fg}};">{{next}}</text>
         </div>
       </list-item>
+      <list-item type="offset" if="{{offset}}"><text class="note" style="color:{{fg}};">预览 {{offsetPreview}}</text></list-item>
       <list-item type="clock" if="{{timePicker}}">
         <div class="clockrow">
           <div class="clockcol"><text class="step" onclick="delta(0,1)">＋</text><text class="count">{{hours}}</text><text class="step" onclick="delta(0,-1)">−</text></div>
@@ -21,9 +31,17 @@
         </div>
       </list-item>
       <list-item type="row" for="{{rows}}">
-        <div class="row" style="background-color:{{surface}};" onclick="choose($item.key)">
+        <div class="row" if="{{$item.kind === 'action'}}" style="background-color:{{surface}};" onclick="choose($item.key)">
           <text class="label" style="color:{{fg}};font-size:{{font}}px;">{{$item.label}}</text>
           <text class="note" style="color:{{fg}};" if="{{$item.sub}}">{{$item.sub}}</text>
+        </div>
+        <div class="timeline" if="{{$item.kind === 'timeline'}}" style="background-color:{{surface}};" onclick="choose($item.key)">
+          <text class="times">{{$item.time}}</text>
+          <div class="stripe" style="background-color:{{$item.color}};"></div>
+          <div class="lessonbody">
+            <text class="lessonlabel" style="color:{{fg}};font-size:{{font}}px;">{{$item.label}}</text>
+            <text class="teacher" style="color:{{fg}};">{{$item.sub}} {{$item.badge}}</text>
+          </div>
         </div>
       </list-item>
       <list-item type="footer"><text class="footer">简单课表</text></list-item>
@@ -33,37 +51,65 @@
 <script>
 import { WatchUI } from '../../core/ui.js'
 import { clock, dateText } from '../../core/engine.js'
+import { StartupTrace, commitChanged } from '../../core/performance.js'
 import * as store from '../../platform/store.js'
 import * as ble from '../../platform/ble.js'
+import { explainReverseRole } from '../../platform/phone-client.js'
+import { diagnose } from '../../platform/card-check.js'
 import { publish } from '../../platform/sharing.js'
-let ui = null, tick = null, shareTick = null
+let ui = null, tick = null, shareTick = null, shareTask = null, trace = null
+function stopTicks() { if(tick)clearInterval(tick);if(shareTick)clearInterval(shareTick);tick=null;shareTick=null }
+function shareLater() {
+  if (shareTask !== null) return
+  shareTask = setTimeout(() => { shareTask = null; publish(store.active(), store.db.settings).catch(e => { if(ui) { ui.message=e.message;ui.refresh() } }) }, 0)
+}
 export default {
-  data: { bg:'#080D0B', fg:'#F1F7F3', surface:'#17251D', font:28, title:'正在读取', rows:[], home:false, today:'', course:'', countdown:'', progress:0, progressLabel:'', next:'', message:'', timePicker:false, hours:'00', minutes:'00', seconds:'00' },
+  data: { bg:'#080D0B', fg:'#F1F7F3', surface:'#17251D', font:28, title:'正在读取', rows:[], home:false, schedule:false, offset:false, offsetPreview:'', today:'', course:'', countdown:'', countLabel:'', progress:0, progressLabel:'', next:'', message:'', timePicker:false, hours:'00', minutes:'00', seconds:'00' },
+  onInit() { trace = new StartupTrace();trace.mark('页面创建') },
   async onReady() {
+    if(!trace) { trace=new StartupTrace();trace.mark('页面创建') }
     try {
-      await store.open()
-      const share = () => publish(store.active()).catch(e => { if (ui) { ui.message = e.message; ui.refresh() } })
-      ui = new WatchUI({ db:()=>store.db, save:store.save, publish:share, start:ble.start, stop:ble.stop, send:ble.sendProfile, pull:ble.pull, decide:ble.decide }, model => {
-        const s = store.db.settings, light = s.theme === 'light'
-        this.bg = light ? '#F3F8F4' : '#080D0B'; this.fg = light ? '#0A2114' : '#F1F7F3'; this.surface = light ? '#DDEBE1' : '#17251D'; this.font = s.largeText ? 34 : 28
-        this.title=model.title; this.rows=model.rows; this.message=model.message; this.home=!!model.hero; this.timePicker=model.view==='time'
-        if (model.hero) { const h=model.hero; this.today=dateText(new Date()); this.course=h.title; this.countdown=clock(Math.max(0,h.remaining)); this.progress=Math.round(h.progress*100); this.progressLabel='已过去 '+this.progress+'%'; this.next='下一节 · '+(h.next && h.next.subject ? h.next.subject.name : '暂无') }
-        if (this.timePicker) { this.hours=model.timeParts[0]; this.minutes=model.timeParts[1]; this.seconds=model.timeParts[2] }
+      await store.open(trace)
+      ui = new WatchUI({ db:()=>store.db, save:store.save, publish:shareLater, start:ble.start, stop:ble.stop, send:ble.sendProfile, list:ble.requestCatalog, incoming:ble.incomingRequest, respond:ble.respond, cancel:ble.cancel, pull:ble.pull, decide:ble.decide, trace, diagnose, reverseRole:explainReverseRole, syncStatus:ble.status, previewCard:()=>require('@system.router').push({uri:'/pages/Preview'}) }, (model, timerOnly) => {
+        const s=store.db.settings, light=s.theme==='light', values={}
+        if(!timerOnly) Object.assign(values,{bg:light?'#F3F8F4':'#080D0B',fg:light?'#0A2114':'#F1F7F3',surface:light?'#DDEBE1':'#17251D',font:s.largeText?34:28,title:model.title,rows:model.rows,message:model.message,home:!!model.hero,schedule:model.view==='schedule',offset:model.view==='offset',timePicker:model.view==='time'})
+        if(model.hero) {
+          const h=model.hero, progress=Math.round(h.progress*100)
+          Object.assign(values,{today:dateText(new Date(model.now())),course:h.title,countdown:clock(Math.max(0,h.remaining)),countLabel:h.phase==='CLASS'?'距下课':h.phase==='ENDED'||h.phase==='EMPTY'?'今日已结束':'距上课',progress,progressLabel:'已过去 '+progress+'%',next:'下一节 · '+(h.next&&h.next.subject?h.next.subject.name:'暂无')})
+        }
+        if(model.view==='offset') values.offsetPreview=model.offsetPreview()
+        if(model.view==='time') Object.assign(values,{hours:model.timeParts[0],minutes:model.timeParts[1],seconds:model.timeParts[2]})
+        commitChanged(this,values)
       })
-      ui.refresh(); share(); shareTick=setInterval(share,60000)
+      ui.refresh();trace.mark('首页数据提交');shareLater()
+      this.startTicks()
     } catch(e) { this.message='无法读取，原数据已保留：'+e.message }
   },
-  onShow() { if (!tick) tick=setInterval(()=>{if(ui && ui.view==='home') ui.refresh()},1000) },
-  onHide() { if(tick) clearInterval(tick); tick=null; ble.stop(); if(ui) ui.code='' },
-  onDestroy() { if(tick) clearInterval(tick); if(shareTick) clearInterval(shareTick); tick=null; shareTick=null; ble.stop(); ui=null },
-  onBackPress() { if(ui) ui.back(); return true },
-  choose(key) { if(ui) ui.click(key) },
-  delta(part,n) { if(ui) ui.timeDelta(part,n) }
+  startTicks() { if(!tick)tick=setInterval(()=>{if(ui)ui.tick()},1000);if(!shareTick)shareTick=setInterval(shareLater,60000) },
+  onShow() { this.startTicks();if(ui)ui.tick() },
+  onHide() { stopTicks();ble.stop();if(ui)ui.code='' },
+  onDestroy() { stopTicks();if(shareTask!==null)clearTimeout(shareTask);shareTask=null;ble.stop();ui=null },
+  onBackPress() { if(ui)ui.back();return true },
+  navigate(view) { if(ui)ui.navigate(view) },
+  moveDay(n) { if(ui)ui.moveDay(n) },
+  choose(key) { if(ui)ui.click(key) },
+  delta(part,n) { if(ui)ui.timeDelta(part,n) }
 }
 </script>
 <style>
 .root { width:100%; height:100%; flex-direction:column; }
-.list { width:100%; height:100%; }
+.list { width:100%; flex:1; }
+.nav { width:100%; padding:14px 48px 4px; justify-content:space-around; }
+.navitem { font-size:24px; padding:10px; }
+.datebar { width:100%; padding:0 32px; align-items:center; }
+.daystep { color:#54C589; font-size:40px; padding:6px 18px; }
+.daytitle { flex:1; font-size:22px; text-align:center; }
+.timeline { margin:6px 28px; padding:14px 12px; border-radius:18px; align-items:center; }
+.times { width:76px; font-size:22px; color:#8CA695; }
+.stripe { width:5px; height:64px; border-radius:3px; margin-right:12px; }
+.lessonbody { flex:1; flex-direction:column; }
+.lessonlabel { width:100%; }
+.teacher { font-size:20px; margin-top:6px; }
 .title { width:100%; padding:24px 42px 14px; text-align:center; font-weight:bold; }
 .hero { width:100%; padding:8px 36px; flex-direction:column; align-items:center; }
 .date { font-size:24px; text-align:center; }

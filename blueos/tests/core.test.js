@@ -21,7 +21,7 @@ test('unknown incoming color metadata preserved; invalid schema rejected', () =>
 test('conflict directions', () => { assert.equal(direction('a', 'a', null), 'same'); assert.equal(direction('a', 'b', 'a'), 'receive'); assert.equal(direction('a', 'b', 'b'), 'send'); assert.equal(direction('a', 'b', 'c'), 'conflict') })
 test('preview and copy/replace plus stale preview protection', () => { const p = sample(), incoming = clone(p); incoming.name = '合成新版'; const v = preview(offer(incoming, 'nonce'), p, revision(p)); assert.equal(accept([p], v, 'replace')[0].name, incoming.name); assert.equal(accept([p], v, 'copy').length, 2); p.name = '本地新改'; assert.throws(() => accept([p], v, 'replace')) })
 test('face snapshot has validity and parsed timeline', () => { const s = snapshot(sample(), time('08:10:00'), 'v'); assert.equal(s.timeline.length, 2); assert.ok(s.validUntil > s.updatedAt); assert.equal(s.schema, 1) })
-test('frame detects corruption, truncated and oversized packets', () => { const f = frame(OP.DATA, 1, 1, [2, 3]); f[10] ^= 1; assert.throws(() => decode(f)); assert.throws(() => decode([1])); assert.throws(() => frame(OP.DATA, 1, 1, Array(11).fill(0))) })
+test('frame detects corruption, truncated and oversized packets', () => { const f = frame(OP.DATA, 1, 1, [2, 3]); f[10] ^= 1; assert.throws(() => decode(f)); assert.throws(() => decode([1])); assert.throws(() => frame(OP.DATA, 1, 1, Array(101).fill(0))) })
 test('dropped ACK, duplicate DATA/END, durable restart and resume', async () => {
   const message = { type: 'OFFER', profile: sample(), nonce: 'synthetic' }; let disk = null, delivered = 0
   let r = new Receiver(null, async s => { disk = clone(s) }, async m => { assert.deepEqual(m, message); delivered++ })

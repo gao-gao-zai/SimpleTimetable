@@ -1,0 +1,26 @@
+<template>
+  <div class="root"><list class="list">
+    <list-item type="title"><text class="text">BLE 独立诊断 1.0.1</text></list-item>
+    <list-item type="order"><text class="button" onclick="toggle">{{order}}</text></list-item>
+    <list-item type="start"><text class="button" onclick="start">开启固定数据诊断</text></list-item>
+    <list-item type="short"><text class="button" onclick="broadcast">短UUID广播测试（60秒）</text></list-item>
+    <list-item type="stop"><text class="button" onclick="stop">停止</text></list-item>
+    <list-item type="log"><text class="text">{{log}}</text></list-item>
+  </list></div>
+</template>
+<script>
+import { DiagnosticServer } from '../../probe.js'
+let server=null,listenFirst=true,lines=[]
+export default {
+  data:{order:'先监听后注册',log:'仅固定数据；不处理课表；报告不含验证码或课程正文'},
+  toggle(){listenFirst=!listenFirst;this.order=listenFirst?'先监听后注册':'先注册后监听'},
+  launch(short){if(server)server.stop();try{server=new DiagnosticServer(require('@blueos.bluetooth.ble'),s=>{lines.push(s);if(lines.length>40)lines.shift();this.log=lines.join('\n')});server.start(listenFirst,short)}catch(e){this.log='启动失败 '+e.message}},
+  start(){this.launch(false)},broadcast(){this.launch(true)},stop(){if(server)server.stop();this.log+='\n已停止'},onHide(){this.stop()},onDestroy(){if(server)server.stop();server=null}
+}
+</script>
+<style>
+.root{width:100%;height:100%;background-color:#080D0B;}
+.list{width:100%;height:100%;}
+.text{width:100%;font-size:22px;color:#F1F7F3;padding:16px 28px;}
+.button{width:100%;font-size:26px;color:#54C589;padding:18px 30px;text-align:center;}
+</style>

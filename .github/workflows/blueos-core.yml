@@ -1,7 +1,7 @@
 name: BlueOS recovery core
 on:
   push:
-    branches: ['codex/recover-blueos-v0.1.0']
+    branches: ['codex/recover-blueos-v0.1.0', 'recovery/**']
   pull_request:
   workflow_dispatch:
 jobs:
@@ -14,4 +14,4 @@ jobs:
           node-version: '22'
       - run: node --test blueos/tests/*.test.js
       - run: node blueos/scripts/verify-source.mjs
-      - run: node blueos/scripts/vectors.js && git diff --exit-code -- protocol/vectors.json
+      - run: node blueos/scripts/vectors.js && node blueos/scripts/transfer-vectors.js && git diff --exit-code -- protocol/vectors.json protocol/transfer-vectors.json

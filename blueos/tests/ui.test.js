@@ -20,7 +20,7 @@ test('referenced item deletion blocked before storage',async()=>{const {ui,db,p}
 test('explicit activation applies only on confirmed save',async()=>{const {ui,db,p}=setup();ui.begin('plans',p.plans[0]);await press(ui,'显式启用（保存后）');assert.equal(db().profiles[0].manualPlan,'');await press(ui,'保存并确认');await press(ui,'确认');assert.equal(db().profiles[0].manualPlan,'plan')})
 test('three-column time increments seconds independently',()=>{const {ui}=setup();let value=0;ui.chooseTime('time',8*3600,v=>value=v,'home');ui.timeDelta(2,1);assert.equal(ui.timeEdit.value,28801);ui.timeDelta(1,1);assert.equal(ui.timeEdit.value,28861)})
 test('link retries dropped ACK and times out after limit',async()=>{let now=0,sent=0,error='';const l=new Link({sendRaw:()=>sent++,load:async()=>null,save:async()=>{},deliver:async()=>{},error:e=>error=e.message,now:()=>now});l.enqueue(1,{synthetic:true});for(let i=0;i<6;i++){now+=2001;l.tick()}assert.equal(sent,6);assert.equal(l.online,false);assert.match(error,/中断/)})
-test('full duplex links deliver with lost ACK and durable restart state',async()=>{
+test('full duplex links deliver with lost ACK using bounded session memory',async()=>{
  let now=0;const qa=[],qb=[],diskA={},diskB={};let gotA=0,gotB=0,drop=true
  const a=new Link({sendRaw:p=>qb.push(p),load:async n=>diskA[n],save:async(n,s)=>{diskA[n]=clone(s)},deliver:async()=>gotA++,error:e=>assert.fail(e.message),now:()=>now})
  const b=new Link({sendRaw:p=>{if(drop&&decode(p).op===OP.ACK){drop=false;return};qa.push(p)},load:async n=>diskB[n],save:async(n,s)=>{diskB[n]=clone(s)},deliver:async()=>gotB++,error:e=>assert.fail(e.message),now:()=>now})

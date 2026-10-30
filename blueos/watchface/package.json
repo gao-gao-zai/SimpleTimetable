@@ -1,5 +1,6 @@
 {
   "name": "simpletimetable-watchface",
-  "version": "0.1.0",
-  "private": true
+  "version": "0.1.5",
+  "private": true,
+  "type": "module"
 }

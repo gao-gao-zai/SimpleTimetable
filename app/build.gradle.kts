@@ -20,8 +20,8 @@ android {
         applicationId = "io.github.gaogaoza.simpletimetable"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.1.2-blueos.1"
+        versionCode = 14
+        versionName = "0.1.2-blueos.11"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; buildConfig = true }

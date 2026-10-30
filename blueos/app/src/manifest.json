@@ -1,14 +1,14 @@
 {
-  "package": "io.github.gaogaoza.simpletimetable.blueos",
+  "package": "com.ggz.app.simpletimetable",
   "name": "简单课表",
   "icon": "/assets/icon.png",
-  "versionName": "0.1.0",
-  "versionCode": 1,
+  "versionName": "0.1.27",
+  "versionCode": 27,
   "config": {
-    "designWidth": 466
+    "designWidth": 432
   },
   "deviceTypeList": [
-    "watch"
+    "watch-square"
   ],
   "appCategory": [
     "education"
@@ -18,13 +18,22 @@
       "name": "blueos.bluetooth.ble"
     },
     {
-      "name": "blueos.storage.storage"
+      "name": "system.storage"
     },
     {
-      "name": "blueos.storage.exchange"
+      "name": "service.exchange"
     },
     {
-      "name": "blueos.app.event.eventManager"
+      "name": "system.event"
+    },
+    {
+      "name": "system.package"
+    },
+    {
+      "name": "system.brightness"
+    },
+    {
+      "name": "system.router"
     }
   ],
   "permissions": [
@@ -38,6 +47,9 @@
       "pages/Main": {
         "component": "index",
         "followHand": "disable"
+      },
+      "pages/Preview": {
+        "component": "index"
       }
     },
     "widgets": {
@@ -47,23 +59,23 @@
         "description": "只读课程摘要，过期提示",
         "component": "index",
         "minCardPlatformVersion": 2000,
-        "versionCode": 1,
-        "versionName": "0.1.0",
+        "versionCode": 27,
+        "versionName": "0.1.27",
         "sizes": [
           "2x2"
         ],
         "deviceTypeList": [
-          "watch"
+          "watch-square"
         ],
         "features": [
           {
-            "name": "blueos.storage.storage"
+            "name": "system.storage"
           },
           {
-            "name": "blueos.storage.exchange"
+            "name": "service.exchange"
           },
           {
-            "name": "blueos.app.event.eventManager"
+            "name": "system.event"
           }
         ],
         "previewImages": [

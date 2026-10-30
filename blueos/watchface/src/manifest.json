@@ -1,12 +1,12 @@
 {
-  "package": "io.github.gaogaoza.simpletimetable.watchface",
-  "versionName": "0.1.0",
-  "versionCode": 1,
+  "package": "com.ggz.watch.timetableprobe",
+  "versionName": "0.1.5",
+  "versionCode": 5,
   "config": {
-    "designWidth": 466
+    "designWidth": 432
   },
   "deviceTypeList": [
-    "watch"
+    "watch-square"
   ],
   "router": {
     "watchfaces": {
@@ -17,13 +17,13 @@
         "edit": "",
         "features": [
           {
-            "name": "blueos.storage.storage"
+            "name": "system.storage"
           },
           {
-            "name": "blueos.storage.exchange"
+            "name": "service.exchange"
           },
           {
-            "name": "blueos.app.event.eventManager"
+            "name": "system.event"
           }
         ],
         "params": {

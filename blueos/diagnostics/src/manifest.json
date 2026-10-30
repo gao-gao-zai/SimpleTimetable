@@ -1,0 +1,33 @@
+{
+  "package": "com.ggz.bleprobe",
+  "name": "BLE独立诊断",
+  "versionName": "1.0.1",
+  "versionCode": 1,
+  "config": {
+    "designWidth": 432
+  },
+  "deviceTypeList": [
+    "watch-square"
+  ],
+  "features": [
+    {
+      "name": "blueos.bluetooth.ble"
+    }
+  ],
+  "permissions": [
+    {
+      "name": "blueos.permission.BLUETOOTH"
+    }
+  ],
+  "router": {
+    "entry": "pages/Main",
+    "pages": {
+      "pages/Main": {
+        "component": "index"
+      }
+    }
+  },
+  "display": {
+    "backgroundColor": "#080D0B"
+  }
+}

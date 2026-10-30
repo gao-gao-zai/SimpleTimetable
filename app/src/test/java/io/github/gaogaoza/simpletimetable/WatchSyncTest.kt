@@ -19,7 +19,7 @@ class WireTest {
     }
     @Test fun sharedCanonicalRevisionVectors() { vectors["revisions"].asJsonArray.forEach { assertEquals(it.asJsonObject["revision"].asString, Wire.revision(it.asJsonObject["message"])) } }
     @Test fun crcVectors() { assertEquals(0x29b1, Wire.crc16("123456789".toByteArray())); assertEquals(0xcbf43926L, Wire.crc32("123456789".toByteArray())) }
-    @Test fun corruptedFrameAndLimitRejected() { val f = Wire.frame(Wire.DATA, 1, 1, byteArrayOf(1)); f[10] = 2; assertThrows(IllegalArgumentException::class.java) { Wire.decode(f) }; assertThrows(IllegalArgumentException::class.java) { Wire.frame(2, 1, 1, ByteArray(11)) } }
+    @Test fun corruptedFrameAndLimitRejected() { val f = Wire.frame(Wire.DATA, 1, 1, byteArrayOf(1)); f[10] = 2; assertThrows(IllegalArgumentException::class.java) { Wire.decode(f) }; assertThrows(IllegalArgumentException::class.java) { Wire.frame(2, 1, 1, ByteArray(101)) } }
     @Test fun resumeAndDuplicateEndDeliveredOnce() {
         val m = JsonParser.parseString("""{"type":"synthetic","text":"合成😀"}""").asJsonObject
         var disk: JsonObject? = null; var delivered = 0

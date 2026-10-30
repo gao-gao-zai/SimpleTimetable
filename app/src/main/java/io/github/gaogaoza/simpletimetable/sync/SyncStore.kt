@@ -9,10 +9,8 @@ import java.io.File
 class SyncStore(context: Context, private val repository: Repository) {
     private val gson = GsonBuilder().disableHtmlEscaping().create()
     private val file = AtomicFile(File(context.filesDir, "watch-sync.json"))
-    private val journal = AtomicFile(File(context.filesDir, "watch-transfer.json"))
     var meta: JsonObject = read(file) ?: JsonObject().apply { add("common", JsonObject()); add("original", JsonObject()); add("receipts", JsonArray()) }
         private set
-    private var transfers: JsonObject = read(journal) ?: JsonObject()
     private fun read(file: AtomicFile): JsonObject? {
         if (!file.baseFile.exists() && !File(file.baseFile.path + ".bak").exists()) return null
         return file.openRead().bufferedReader().use { JsonParser.parseReader(it).asJsonObject }
@@ -22,12 +20,6 @@ class SyncStore(context: Context, private val repository: Repository) {
         try { out.write(gson.toJson(value).toByteArray(Charsets.UTF_8)); file.finishWrite(out) } catch (e: Exception) { file.failWrite(out); throw e }
     }
     fun update(change: (JsonObject) -> Unit) { val next = meta.deepCopy(); change(next); write(file, next); meta = next }
-    fun loadTransfer(id: Int): JsonObject? = transfers[id.toString()]?.asJsonObject
-    fun saveTransfer(id: Int, value: JsonObject) {
-        val next = transfers.deepCopy(); next.add(id.toString(), value)
-        while (next.size() > 6) next.remove(next.entrySet().firstOrNull { it.key != id.toString() && it.value.asJsonObject["complete"].asBoolean }?.key ?: next.keySet().first { it != id.toString() })
-        write(journal, next); transfers = next
-    }
     // Preserve future profile metadata without transferring device settings.
     private fun merge(old: JsonElement?, current: JsonElement): JsonElement {
         if (current.isJsonObject) { val result = if (old?.isJsonObject == true) old.asJsonObject.deepCopy() else JsonObject(); current.asJsonObject.entrySet().forEach { (k, v) -> result.add(k, merge(result[k], v)) }; return result }

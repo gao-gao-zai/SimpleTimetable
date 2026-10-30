@@ -9,3 +9,12 @@ signing.properties
 signing-*.properties
 .idea/
 captures/
+node_modules/
+**/dist/
+*.apk
+*.aab
+*.rpk
+*.rpks
+*.pem
+*.key
+*.pfx

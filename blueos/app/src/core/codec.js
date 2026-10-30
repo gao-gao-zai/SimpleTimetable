@@ -16,24 +16,28 @@ export function utf8(text) {
   return new Uint8Array(out)
 }
 export function text(bytes) {
-  let out = ''
+  const parts = []; let codes = []
+  const emit = c => { codes.push(c); if(codes.length >= 128) { parts.push(String.fromCharCode.apply(null,codes));codes=[] } }
   for (let i = 0; i < bytes.length;) {
     const a = bytes[i++]; let c, n, min
-    if (a < 128) { out += String.fromCharCode(a); continue }
+    if (a < 128) { emit(a); continue }
     if (a >= 194 && a <= 223) { c = a & 31; n = 1; min = 128 }
     else if (a >= 224 && a <= 239) { c = a & 15; n = 2; min = 2048 }
     else if (a >= 240 && a <= 244) { c = a & 7; n = 3; min = 65536 }
     else throw Error('Invalid UTF-8')
     while (n--) { const b = bytes[i++]; if (!(b >= 128 && b <= 191)) throw Error('Invalid UTF-8'); c = c << 6 | b & 63 }
     if (c < min || c > 0x10ffff || c >= 0xd800 && c <= 0xdfff) throw Error('Invalid UTF-8')
-    if (c <= 65535) out += String.fromCharCode(c)
-    else { c -= 65536; out += String.fromCharCode(0xd800 | c >> 10, 0xdc00 | c & 1023) }
+    if (c <= 65535) emit(c)
+    else { c -= 65536; emit(0xd800 | c >> 10); emit(0xdc00 | c & 1023) }
   }
-  return out
+  if(codes.length)parts.push(String.fromCharCode.apply(null,codes))
+  return parts.join('')
 }
+const CRC32_TABLE = new Uint32Array(256)
+for(let i=0;i<256;i++){let c=i;for(let j=0;j<8;j++)c=c>>>1^(c&1?0xedb88320:0);CRC32_TABLE[i]=c>>>0}
 export function crc32(bytes) {
   let c = -1
-  for (let i = 0; i < bytes.length; i++) { c ^= bytes[i]; for (let j = 0; j < 8; j++) c = c >>> 1 ^ (c & 1 ? 0xedb88320 : 0) }
+  for (let i = 0; i < bytes.length; i++) c = c >>> 8 ^ CRC32_TABLE[(c ^ bytes[i]) & 255]
   return (c ^ -1) >>> 0
 }
 export function crc16(bytes) {

@@ -1,12 +1,25 @@
-import { clone, dateText, dateAt, moveDate, resolve, state, clock } from './engine.js'
+import { clone, dateText, dateAt, moveDate, resolve, state, clock, EngineCache } from './engine.js'
 import { emptyProfile, id, validate, sample, lessonChange, swap } from './model.js'
+import { effectiveNow, offsetSeconds, offsetLabel } from './clock.js'
 export class WatchUI {
-  constructor(api, render) { this.api = api; this.render = render; this.view = 'home'; this.profileId = ''; this.date = dateText(new Date()); this.draft = null; this.actions = {}; this.message = ''; this.code = ''; this.phoneProfiles = []; this.busy = false; this.swapFrom = null }
+  constructor(api, render) { this.api = api; this.render = render; this.cache = new EngineCache(); this.view = 'home'; this.profileId = ''; this.date = dateText(new Date(this.now())); this.draft = null; this.actions = {}; this.message = ''; this.code = ''; this.phoneProfiles = []; this.busy = false; this.swapFrom = null }
+  now() { return effectiveNow(this.api.db().settings, this.api.now ? this.api.now() : Date.now()) }
   db() { return this.api.db() }
   profile() { return this.db().profiles.find(p => p.id === this.profileId) || this.db().profiles.find(p => p.id === this.db().activeProfile) || this.db().profiles[0] }
-  row(label, action, sub = '') { const key = String(Object.keys(this.actions).length); this.actions[key] = action; return { key, label, sub } }
+  row(label, action, sub = '') { const key = String(Object.keys(this.actions).length); this.actions[key] = action; return { key, label, sub, kind: 'action', color: '#54C589', time: '', badge: '' } }
   async click(key) { if (this.busy) return; try { this.busy = true; const fn = this.actions[key]; if (fn) await fn() } catch (e) { this.message = e.message } finally { this.busy = false; this.refresh() } }
   show(title, rows) { this.title = title; this.rows = rows; this.render(this) }
+  navigate(view) {
+    if (this.draft) { this.confirm('放弃未保存修改？', () => { this.draft = null; this.go(view) }, this.view); return }
+    if (this.view === 'offset') { this.confirm('放弃未保存偏移？', () => this.go(view), 'offset'); return }
+    if (view === 'schedule') { this.profileId = ''; this.date = dateText(new Date(this.now())) }
+    this.go(view)
+  }
+  tick() {
+    if (this.view !== 'home' && this.view !== 'offset') return
+    this.hero = this.view === 'home' ? this.cache.state(this.db().profiles.find(p => p.id === this.db().activeProfile) || this.db().profiles[0], this.now()) : this.hero
+    this.render(this, true)
+  }
   go(view) { this.view = view; this.message = ''; this.refresh() }
   choices(title, values, apply, back) { this.picker = { title, values, apply, back }; this.go('pick') }
   names(value, presets) { return [...new Set([value, ...presets, '自定义预设 ' + (this.profile().subjects.length + this.profile().plans.length + this.profile().layouts.length + 1)])].filter(Boolean).map(x => ({ label: x, value: x })) }
@@ -23,7 +36,7 @@ export class WatchUI {
     this.draft = null; this.go(this.collection); this.api.publish()
   }
   leaveDraft() { this.confirm('放弃未保存修改？', () => { this.draft = null; this.go(this.collection) }, 'edit') }
-  back() { if (this.draft) { this.leaveDraft(); return }; this.go(this.view === 'home' ? 'home' : 'more') }
+  back() { if (this.view === 'offset') { this.navigate('more'); return }; if (this.draft) { this.leaveDraft(); return }; this.go(this.view === 'home' ? 'home' : 'more') }
   newItem(collection) {
     const p = this.profile(); let x
     if (collection === 'subjects') x = { id: id(), name: '新科目', shortName: '', teacher: '', color: '#355E45', outdoor: false, favorite: false }
@@ -35,11 +48,11 @@ export class WatchUI {
   }
   subjectPicker(apply, back, allowEmpty = true) { const subs = (this.draft || this.profile()).subjects.slice().sort((a, b) => Number(!!b.favorite) - Number(!!a.favorite)); this.choices('选择科目', (allowEmpty ? [{ label: '无科目 / 停课', value: '' }] : []).concat(subs.map(s => ({ label: (s.favorite ? '★ ' : '') + s.name, value: s.id }))), apply, back) }
   refresh() {
-    if (!this.db()) return
+    if (this.busy || !this.db()) return
     this.actions = {}; const row = (...args) => this.row(...args), p = this.profile(), back = () => this.go('more')
-    if (this.view === 'home') { const active = this.db().profiles.find(p => p.id === this.db().activeProfile) || this.db().profiles[0]; this.hero = state(active); this.show('现在', [row('课表', () => { this.date = dateText(new Date()); this.go('schedule') }), row('更多', back)]); return }
+    if (this.view === 'home') { const active = this.db().profiles.find(p => p.id === this.db().activeProfile) || this.db().profiles[0]; this.hero = state(active); this.show('现在', [row('课表', () => { this.date = dateText(new Date(this.now())); this.go('schedule') }), row('更多', back)]); return }
     this.hero = null
-    if (this.view === 'more') { this.show('更多', [row('返回现在', () => this.go('home')), ...[['profiles', '档案'], ['subjects', '科目'], ['layouts', '作息'], ['plans', '课表'], ['groups', '课表群与启用'], ['temporary', '临时安排'], ['sync', '手机同步'], ['settings', '显示']].map(([v, label]) => row(label, () => this.go(v)))]); return }
+    if (this.view === 'more') { this.show('管理', [ ...[['profiles', '档案'], ['subjects', '科目'], ['layouts', '作息'], ['plans', '课表'], ['groups', '课表群与启用'], ['temporary', '临时安排'], ['sync', '手机同步'], ['offset', '时间与偏移'], ['settings', '显示'], ['advanced', '高级与诊断']].map(([v, label]) => row(label, () => { if (v === 'offset') this.offsetDraft = offsetSeconds(this.db().settings); this.go(v) }))]); return }
     if (this.view === 'confirm') { const c = this.confirmation; this.show(c.title, [row('确认', c.action), row('取消', () => this.go(c.back))]); return }
     if (this.view === 'pick') { const c = this.picker; this.show(c.title, c.values.map(v => row(v.label, () => c.apply(v.value))).concat(row('返回', () => this.go(c.back)))); return }
     if (this.view === 'number') { const e = this.numberEdit; this.show(e.title + '：' + e.target[e.field], [row('−', () => { e.target[e.field] = Math.max(e.min, e.target[e.field] - 1) }), row('+', () => { e.target[e.field] = Math.min(e.max, e.target[e.field] + 1) }), row('完成', () => this.go(e.back))]); return }
@@ -48,15 +61,34 @@ export class WatchUI {
     if (this.view === 'profiles') { this.show('档案 · 浏览与启用分离', this.db().profiles.map(x => row((x.id === this.db().activeProfile ? '已启用 · ' : '') + x.name, () => { this.profileId = x.id; this.go('profile') })).concat(row('新建空白档案', () => this.confirm('创建空白档案？', async () => { await this.api.save(d => d.profiles.push(emptyProfile())); this.go('profiles') }, 'profiles')), row('添加合成示例', () => this.confirm('添加合成示例？', async () => { await this.api.save(d => d.profiles.push(sample())); this.go('profiles') }, 'profiles')), row('返回', back))); return }
     if (this.view === 'profile') { this.show(p.name, [row('浏览课表', () => this.go('schedule')), row('显式启用此档案', () => this.confirm('启用 ' + p.name + '？', async () => { await this.api.save(d => { d.activeProfile = p.id }); this.api.publish(); this.go('profile') }, 'profile')), row('预设改名', () => this.choices('档案名称', this.names(p.name, ['我的课表', '学校课表', '假期课表', '备用课表']), v => this.confirm('保存名称？', async () => { await this.api.save(d => { d.profiles.find(x => x.id === p.id).name = v }); this.go('profile') }, 'profile'), 'profile')), row('复制档案', () => this.confirm('复制 ' + p.name + '？', async () => { const c = clone(p); c.id = id(); c.name += ' 副本'; await this.api.save(d => d.profiles.push(c)); this.go('profiles') }, 'profile')), row('删除档案', () => this.confirm('删除档案？', async () => { if (p.id === this.db().activeProfile || this.db().profiles.length === 1) throw Error('请先启用其他档案，至少保留一个档案'); await this.api.save(d => { d.profiles = d.profiles.filter(x => x.id !== p.id) }); this.profileId = ''; this.go('profiles') }, 'profile')), row('返回', () => this.go('profiles'))]); return }
     if (['subjects', 'layouts', 'plans', 'groups', 'temporary'].includes(this.view)) { const c = this.view; this.show({ subjects: '科目', layouts: '作息', plans: '课表', groups: '课表群', temporary: '临时安排' }[c], [row('返回', back), row('新建', () => this.newItem(c)), ...p[c].map(x => row((x.favorite ? '★ ' : '') + x.name, () => this.begin(c, x), c === 'temporary' ? dateText(new Date(x.startMillis)) + ' 至 ' + dateText(new Date(x.endMillis)) : ''))]); return }
-    if (this.view === 'settings') { this.show('显示 · 系统时间', [row('主题：' + (this.db().settings.theme === 'light' ? '亮' : '深'), () => this.confirm('切换主题？', async () => { await this.api.save(d => { d.settings.theme = d.settings.theme === 'light' ? 'dark' : 'light' }); this.go('settings') }, 'settings')), row('大字号：' + (this.db().settings.largeText ? '开' : '关'), () => this.confirm('切换字号？', async () => { await this.api.save(d => { d.settings.largeText = !d.settings.largeText }); this.go('settings') }, 'settings')), row('时间跟随手表系统', () => {}), row('返回', back)]); return }
+    if (this.view === 'advanced') { this.show('高级与诊断', [row('启动耗时', () => this.go('startup')), row('课程卡预览', () => this.api.previewCard()), row('连接与传输诊断', () => this.go('connectionDiagnostics')), row('备用连接能力', () => {this.message=this.api.reverseRole()}), row('课程卡安装检查', async () => { this.cardReport = await this.api.diagnose(); this.go('cardCheck') }), row('返回管理', back)]); return }
+    if(this.view==='connectionDiagnostics'){const s=this.api.syncStatus();this.show('模式：普通课表同步',[row('连接/订阅/验证',()=>{},JSON.stringify({active:s.active,subscribed:s.subscribed,paired:s.paired,stateField:s.stateField})),row('接口计数',()=>{},JSON.stringify(s.counters)),row('传输能力与大小',()=>{},JSON.stringify({transport:s.transport,transfer:s.transfer})),row('返回',()=>this.go('advanced'))]);return}
+    if (this.view === 'startup') { this.show('启动耗时（本次进程）', (this.api.trace ? this.api.trace.rows().map(x => row(x.label, () => {}, x.sub)) : [row('暂无本次记录', () => {})]).concat(row('返回', () => this.go('advanced')))); return }
+    if (this.view === 'cardCheck') { this.show('课程卡安装检查', (this.cardReport ? [row(this.cardReport.verdict, () => {}), ...this.cardReport.results.map(r => row(r.name, () => {}, r.state + (r.state==='ok'?' / '+r.result:'') + (r.error?' / '+r.error:'')))] : []).concat([row('标准卡需要固件支持', () => {}, '侧滑系统卡仍需真机验证'), row('同签名与共享摘要', () => {}, '打开 App 更新，摘要最多有效一小时'), row('返回', () => this.go('advanced'))])); return }
+    if (this.view === 'offset') {
+      if (!Number.isInteger(this.offsetDraft)) this.offsetDraft = offsetSeconds(this.db().settings)
+      const delta = n => { this.offsetDraft = Math.max(-86400, Math.min(86400, this.offsetDraft + n)) }
+      this.show('时间与偏移 · ' + offsetLabel(this.offsetDraft), [row('−60 秒', () => delta(-60)), row('−1 秒', () => delta(-1)), row('+1 秒', () => delta(1)), row('+60 秒', () => delta(60)), row('归零', () => { this.offsetDraft = 0 }), row('保存偏移', async () => { const value = this.offsetDraft; await this.api.save(d => { d.settings.timeOffsetSeconds = value }); this.go('more'); this.api.publish() }), row('取消', back)]); return
+    }
+    if (this.view === 'settings') { this.show('显示', [row('主题：' + (this.db().settings.theme === 'light' ? '亮' : '深'), () => this.confirm('切换主题？', async () => { await this.api.save(d => { d.settings.theme = d.settings.theme === 'light' ? 'dark' : 'light' }); this.go('settings') }, 'settings')), row('大字号：' + (this.db().settings.largeText ? '开' : '关'), () => this.confirm('切换字号？', async () => { await this.api.save(d => { d.settings.largeText = !d.settings.largeText }); this.go('settings') }, 'settings')), row('返回', back)]); return }
     if (this.view === 'schedule') {
-      const r = resolve(p, this.date)
-      this.show(this.date + ' 周' + '日一二三四五六'[dateAt(this.date).getDay()], [row('上一天', () => { this.date = moveDate(this.date, -1) }), row('下一天', () => { this.date = moveDate(this.date, 1) }), row('选择日期', () => this.chooseDate('浏览日期', this.date, v => { this.date = v; this.go('schedule') }, 'schedule')), ...(r.lessons.length ? r.lessons.map(e => row(clock(e.slot.start) + ' ' + (e.subject ? e.subject.name : '停课/未安排'), () => { this.lesson = { date: this.date, planId: e.planId, slotId: e.sourceSlotId, subjectId: e.subject ? e.subject.id : '' }; if (this.swapFrom) { this.swapTo = this.lesson; this.go('swap') } else this.go('lesson') }, clock(e.slot.end) + (e.temporary ? ' · 临时' : ''))) : [row('今天没有课程', () => {})]), row('返回', () => { this.swapFrom = null; this.go('home') })]); return
+      const r = this.cache.day(p, this.date, this.now())
+      const items = r.lessons.map(e => ({ start: e.slot.start, end: e.slot.end, e })).concat(r.slots.filter(s => s.type !== 'LESSON').map(slot => ({ start: slot.start, end: slot.end, slot }))).sort((a,b) => a.start-b.start)
+      const rows = items.map(x => {
+        const e = x.e, slot = e ? e.slot : x.slot
+        const item = row(e ? e.subject ? e.subject.name : '停课/未安排' : slot.name || '课间', () => {
+          if (!e) return
+          this.lesson = { date: this.date, planId: e.planId, slotId: e.sourceSlotId, subjectId: e.subject ? e.subject.id : '' }
+          if (this.swapFrom) { this.swapTo = this.lesson; this.go('swap') } else this.go('lesson')
+        }, e && e.subject ? e.subject.teacher || '' : '')
+        return { ...item, kind: 'timeline', time: clock(slot.start).slice(0,5) + '\n' + clock(slot.end).slice(0,5), color: e && e.subject ? e.subject.color : '#789487', badge: e && e.temporary ? '临时' : !e ? '课间' : '' }
+      })
+      this.show(this.date + ' 周' + '日一二三四五六'[dateAt(this.date).getDay()], (rows.length ? rows : [row('今天没有课程', () => {})]).concat(row('选择日期', () => this.chooseDate('浏览日期', this.date, v => { this.date = v; this.go('schedule') }, 'schedule')))); return
     }
     if (this.view === 'lesson') { const a = this.lesson; this.show('课程操作', [row('临时换课', () => this.subjectPicker(v => this.confirm('保存当日换课？', async () => { await this.api.save(d => { d.profiles = d.profiles.map(x => x.id === p.id ? lessonChange(x, a.date, a.planId, a.slotId, v) : x) }); this.api.publish(); this.go('schedule') }, 'lesson'), 'lesson')), row('指定日期停课', () => this.confirm('只在这一天停课？', async () => { await this.api.save(d => { d.profiles = d.profiles.map(x => x.id === p.id ? lessonChange(x, a.date, a.planId, a.slotId, '') : x) }); this.api.publish(); this.go('schedule') }, 'lesson')), row('永久更换科目', () => this.subjectPicker(v => this.confirm('修改所有匹配日期？', async () => { await this.api.save(d => { d.profiles = d.profiles.map(x => x.id === p.id ? lessonChange(x, a.date, a.planId, a.slotId, v, true) : x) }); this.api.publish(); this.go('schedule') }, 'lesson'), 'lesson')), row('交换：选择另一节课', () => { this.swapFrom = a; this.go('schedule') }), row('返回', () => this.go('schedule'))]); return }
     if (this.view === 'swap') { const apply = permanent => this.confirm(permanent ? '永久交换？' : '保存跨日临时交换？', async () => { await this.api.save(d => { d.profiles = d.profiles.map(x => x.id === p.id ? swap(x, this.swapFrom, this.swapTo, permanent) : x) }); this.swapFrom = null; this.api.publish(); this.go('schedule') }, 'swap'); this.show('选择交换方式', [row('仅指定日期', () => apply(false)), row('永久交换', () => apply(true)), row('取消', () => { this.swapFrom = null; this.go('schedule') })]); return }
     if (this.view === 'sync') {
-      this.show('手机同步', [row(this.code ? '连接码 ' + this.code : '开启同步', () => { if (!this.code) this.code = this.api.start((msg, profiles) => { this.message = msg; if (profiles) this.phoneProfiles = profiles; this.refresh() }) }), row('发送当前浏览档案', () => this.confirm('发送 ' + p.name + '，手机确认后才保存？', () => this.api.send(p), 'sync')), ...this.phoneProfiles.map(x => row('接收 ' + x.name, () => this.api.pull(x.id))), ...(this.db().pending ? [row('预览收到的档案', () => this.go('preview'), this.db().pending.summary)] : []), row('结束同步', () => { this.api.stop(); this.code = ''; this.phoneProfiles = []; this.go('more') }), row('返回', back)]); return
+      this.show('手机同步', [row(this.code ? '连接码 ' + this.code : '开启同步', async () => { if (!this.code) this.code = await this.api.start((msg, profiles, status) => { if(status&&status.active===false)this.code='';this.message = msg; if (profiles) this.phoneProfiles = profiles; this.refresh() }) }), ...(this.api.incoming && this.api.incoming() ? [row('同意接收 · '+this.api.incoming().name, () => this.api.respond(true)), row('拒绝接收', () => this.api.respond(false))] : []), row('取消本次传输', () => this.api.cancel()), row('请求手机档案列表', () => this.api.list()), row('发送当前浏览档案', () => this.confirm('发送 ' + p.name + '，手机确认后才保存？', () => this.api.send(p), 'sync')), ...this.phoneProfiles.map(x => row('接收 ' + x.name, () => this.api.pull(x.id))), ...(this.db().pending ? [row('预览收到的档案', () => this.go('preview'), this.db().pending.summary)] : []), row('结束同步', () => { this.api.stop(); this.code = ''; this.phoneProfiles = []; this.go('more') }), row('返回', back)]); return
     }
     if (this.view === 'preview') { const v = this.db().pending; if (!v) { this.go('sync'); return }; this.show('接收预览 · ' + ({ same: '版本相同', receive: '建议手机版', send: '建议手表版', conflict: '双端均有修改', choose: '首次同步，请选择' }[v.direction]), [row(v.summary, () => {}), row('保存手机版', () => this.confirm('用手机版替换？', async () => { await this.api.decide('replace', v.message.nonce); this.api.publish(); this.go('sync') }, 'preview')), row('保留手表版', () => this.confirm('保留手表版？', async () => { await this.api.decide('keep', v.message.nonce); this.go('sync') }, 'preview')), row('手机版另存副本', () => this.confirm('另存新档案？', async () => { await this.api.decide('copy', v.message.nonce); this.go('sync') }, 'preview')), row('稍后决定', () => this.go('sync'))]); return }
     if (this.view === 'edit') { this.editRows(); return }
@@ -65,6 +97,8 @@ export class WatchUI {
     if (this.view === 'days') { const q = this.item(); this.show('星期多选', [0, 1, 2, 3, 4, 5, 6].map(d => row((q.days.includes(d) ? '✓ ' : '') + '星期' + '日一二三四五六'[d], () => { q.days = q.days.includes(d) ? q.days.filter(x => x !== d) : q.days.concat(d) })).concat(row('完成', () => this.go('edit')))); return }
     if (this.view === 'planLessons') { const q = this.item(), l = this.draft.layouts.find(l => l.id === q.layoutId); this.show('逐节安排', l.slots.filter(s => s.type === 'LESSON').map(s => row(s.name + ' · ' + ((this.draft.subjects.find(x => x.id === q.subjects[s.id]) || {}).name || '默认'), () => this.subjectPicker(v => { q.subjects[s.id] = v; this.go('planLessons') }, 'planLessons'))).concat(row('返回', () => this.go('edit')))); return }
   }
+  moveDay(n) { this.date = moveDate(this.date, n); this.refresh() }
+  offsetPreview() { const now = this.api.now ? this.api.now() : Date.now(); const d = new Date(now + this.offsetDraft * 1000); return dateText(d) + ' ' + clock(d.getHours()*3600+d.getMinutes()*60+d.getSeconds()) }
   timeDelta(part, n) { const unit = [3600, 60, 1][part]; this.timeEdit.value = (this.timeEdit.value + unit * n + 86400) % 86400; this.refresh() }
   editRows() {
     const row = (...args) => this.row(...args), c = this.collection, x = this.item(), p = this.draft
